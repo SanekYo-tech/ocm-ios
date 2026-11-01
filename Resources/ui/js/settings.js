@@ -24,7 +24,7 @@ O.openSettings=()=>{
   const accSub=()=>{const sp=accRow.querySelector('.t span');if(!sp)return;
     sp.textContent=S.account&&S.account.email?('Вход выполнен: '+S.account.email):(S.account&&S.account.checked?'Не выполнен — квота Zen общая':'проверяем...')};
   accSub();O.checkAccount().then(accSub);
-  g('Модели');r('key','Подключить провайдера','OpenCode Zen, OpenAI, Anthropic, GitHub Copilot, Google и другие',()=>O.openConnect());
+  g('Модели');r('key','Подключить провайдера','OpenCode Zen: бесплатный режим или свой API-ключ',()=>O.openConnect());
   r('cpu','Модель',S.model?S.model.providerID+'/'+S.model.modelID:'не выбрана',()=>O.openModels());
   g('Оформление');r('palette','Тема и размер текста',({opencode:'OpenCode',light:'Светлая',tokyonight:'Tokyo Night',gruvbox:'Gruvbox'})[S.opts.theme]||S.opts.theme+', '+S.opts.fs+'px',()=>O.openThemes());
   body.append(O.toggleRow('bulb','Показывать размышления','Блоки размышлений в ответах',S.opts.thinking,v=>{S.opts.thinking=v;O.saveOpts();O.chat.renderAll()}));

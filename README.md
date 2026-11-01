@@ -8,6 +8,20 @@
 
 ---
 
+## Конфиг
+
+В корне рабочей папки лежит **`OpenCode/config.json`** — обычный OpenCode-конфиг со схемой `https://opencode.ai/config.json`. Его можно редактировать прямо в приложении «Файлы» или в Настройках → `config.json`.
+
+Поддерживаются:
+
+- `model` / `small_model` — модель по умолчанию (`opencode/big-pickle`);
+- `agents` — свои агенты, их `system`/`prompt`, `model`, `mode`;
+- `default_agent` — агент по умолчанию;
+- `permissions` / `permission` — запрет `bash`, `edit`, `read`, `webfetch` и т.п.;
+- `instructions` + `AGENTS.md` — правила проекта, попадают в системный промпт;
+- `providers.opencode.options.apiKey` — ключ OpenCode Console;
+- `mcp`, `plugins`, `compaction`, `watcher`, `snapshots` — структура сохраняется, приложение читает то, что умеет.
+
 ## Что это
 
 Автономный порт идеи [OpenCode Mobile](https://github.com/lovereplit-bit/OCM) на iOS. Внутри приложения:

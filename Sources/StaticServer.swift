@@ -15,7 +15,15 @@ final class StaticServer {
     }
 
     func start() throws -> UInt16 {
-        let listener = try NWListener(using: .tcp, on: .any)
+        // A stable port keeps the WKWebView origin stable, so localStorage and
+        // IndexedDB (themes, selected model, cached sessions) survive relaunches.
+        if let p = try? startListener(port: 47821) { return p }
+        return try startListener(port: nil)
+    }
+
+    private func startListener(port preferred: UInt16?) throws -> UInt16 {
+        let endpoint: NWEndpoint.Port = preferred.flatMap { NWEndpoint.Port(rawValue: $0) } ?? .any
+        let listener = try NWListener(using: .tcp, on: endpoint)
         self.listener = listener
 
         let ready = DispatchSemaphore(value: 0)

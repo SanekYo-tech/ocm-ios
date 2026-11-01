@@ -5,9 +5,11 @@ enum AgentPaths {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    /// Everything the agent can touch lives here. It is exposed in the Files app.
+    /// Everything the agent can touch lives here. The app's Documents directory is
+    /// exposed in the Files app as the "OpenCode" folder, so the path is simply
+    /// On My iPhone → OpenCode → config.json / your project.
     static var workspace: URL {
-        documents.appendingPathComponent("OpenCode", isDirectory: true)
+        documents
     }
 
     static var configDir: URL {

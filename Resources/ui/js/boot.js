@@ -19,7 +19,7 @@ function welcome(msg){
   screen(logo(),
     h('b',{style:{fontSize:'20px'}},'OpenCode на iPhone'),
     h('p',{class:'mut'},'Полностью на устройстве: файлы, терминал и AI-агент. Компьютер не нужен.'),
-    h('div',{class:'note'},'Рабочая папка — OpenCode. Она видна в приложении «Файлы» → «На iPhone» → «OpenCode». Агент читает и меняет эти файлы, а встроенный терминал выполняет настоящие Unix-команды.'),
+    h('div',{class:'note'},'Рабочая папка — OpenCode в приложении «Файлы» → «На iPhone» → «OpenCode». Рядом лежат config.json и AGENTS.md. Агент читает и меняет эти файлы, а встроенный терминал выполняет настоящие Unix-команды.'),
     signed?h('div',{class:'card',style:{display:'flex',alignItems:'center',gap:'10px',width:'100%'}},O.icon('user'),h('div',{class:'grow'},h('b',null,'Аккаунт OpenCode'),h('div',{class:'mut s'},signed))):null,
     msg?h('p',{class:'err'},msg):null,
     h('button',{class:'btn pri wide',onclick:start},O.icon('chat'),'Начать'),

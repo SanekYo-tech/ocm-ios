@@ -120,3 +120,7 @@ a{color:var(--acc2)}
 .hljs-number,.hljs-symbol,.hljs-bullet{color:var(--warn)}.hljs-title,.hljs-section,.hljs-function .hljs-title{color:var(--acc)}.hljs-attr,.hljs-attribute,.hljs-variable,.hljs-template-variable,.hljs-type,.hljs-name{color:#c792ea}.hljs-deletion{color:var(--err)}.hljs-meta{color:var(--mut)}
 @media (max-width:360px){:root{--fs:13px}}
 @media (max-height:480px){#top{min-height:40px;padding:2px 6px}.ibtn{width:34px;height:34px}.cbox{padding:6px}#composer{padding:4px 10px}#msgs{padding:8px 12px 4px}.status-line{padding:0 12px 4px}}
+/* iOS safe areas: WKWebView draws edge-to-edge */
+#app{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+#boot{padding-top:calc(20px + env(safe-area-inset-top));padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+#toast{bottom:calc(76px + env(safe-area-inset-bottom))}

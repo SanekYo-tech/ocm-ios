@@ -51,7 +51,7 @@ final class AgentEngine {
         func ingest(_ dict: [String: Any]) {
             for (name, value) in dict {
                 guard let a = value as? [String: Any] else { continue }
-                if let p = a["prompt"] as? String ?? a["system"] as? String, !p.isEmpty { prompts[name] = p }
+                if let p = (a["prompt"] as? String) ?? (a["system"] as? String), !p.isEmpty { prompts[name] = p }
                 if let m = modelID(a["model"]) { models[name] = m }
                 if let d = a["description"] as? String { descriptions[name] = d }
                 if let m = a["mode"] as? String { modes[name] = m }
@@ -566,6 +566,7 @@ final class AgentEngine {
     // MARK: - prompt / agent loop
 
     private func startPrompt(sessionID: String, body: [String: Any]) {
+        reloadConfig()
         guard let session = store.session(sessionID) else { return }
         let mid = body["messageID"] as? String ?? newID("msg_")
         let agent = body["agent"] as? String ?? defaultAgent
