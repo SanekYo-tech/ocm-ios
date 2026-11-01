@@ -35,14 +35,18 @@ jobs:
       - name: Generate project
         run: xcodegen generate --spec project.yml
 
-      - name: Pick simulator
+      - name: Pick simulator runtime
         id: sim
         run: |
           set -euo pipefail
-          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
-          UDID=$(python3 -c 'import json,os; d=json.load(open(os.environ["RUNNER_TEMP"]+"/devices.json")); print(next(dev["udid"] for rt,devices in d["devices"].items() if "iOS-18" in rt or "iOS-17" in rt for dev in devices if dev.get("isAvailable") and "iPhone" in dev.get("name","")))')
-          echo "UDID=$UDID" >> "$GITHUB_ENV"
-          echo "Using simulator $UDID"
+          RUNTIME=$(xcrun simctl list runtimes | grep -E 'iOS 18\.' | tail -n1 | sed -E 's/.*(com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9-]+).*/\1/')
+          if [ -z "$RUNTIME" ]; then
+            echo "No iOS 18 simulator runtime available" >&2
+            xcrun simctl list runtimes >&2
+            exit 1
+          fi
+          echo "RUNTIME=$RUNTIME" >> "$GITHUB_ENV"
+          echo "Using runtime $RUNTIME"
 
       - name: Build for simulator
         run: |
@@ -50,7 +54,7 @@ jobs:
           xcodebuild build \
             -project OpenCodeMobile.xcodeproj -scheme OpenCodeMobile -configuration Debug \
             -sdk iphonesimulator \
-            -destination "platform=iOS Simulator,id=$UDID" \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/SimDerived" \
             ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
 
@@ -59,6 +63,8 @@ jobs:
           set -euo pipefail
           APP="$RUNNER_TEMP/SimDerived/Build/Products/Debug-iphonesimulator/OpenCodeMobile.app"
           test -d "$APP"
+          UDID=$(xcrun simctl create "OCM-Smoke" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID" || true
           timeout 180 xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
