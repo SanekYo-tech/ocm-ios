@@ -121,12 +121,12 @@ jobs:
           body: |
             **OpenCode Mobile для iPhone — автономная сборка.**
 
-            Внутри: локальный workspace, файловый агент, реальный Unix-терминал (ios_system), OpenCode Zen (бесплатный режим / вход в аккаунт / свой ключ).
+            Внутри: локальный workspace, файловый агент, реальный Unix-терминал (ios_system), **git (libgit2)**, **Python 3.9**, OpenCode Zen (бесплатный режим / вход в аккаунт / свой ключ), редактируемый `config.json`.
 
             Установка: `.ipa` без подписи. Подпишите своим Apple ID через Sideloadly, AltStore или SideStore.
             Бесплатный Apple ID: 7 дней, затем переподписать. TrollStore — только iOS 14–17.0.
 
-            Ограничения iOS: нет Node/npm/python/git/компиляторов; терминал работает через встроенный набор Unix-команд.
+            Ограничения iOS: нет Node/npm и компиляторов; Python работает без pip/ssl/sqlite3; терминал использует встроенный набор Unix-команд.
           files: ${{ env.IPA_PATH }}
           make_latest: true
           fail_on_unmatched_files: true

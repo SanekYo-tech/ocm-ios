@@ -58,3 +58,31 @@ Files under `Resources/ui` are adapted from
 - DOMPurify — Apache-2.0 / MPL-2.0
 - highlight.js — BSD-3-Clause
 - xterm.js — MIT
+
+## libgit2
+
+The app links the prebuilt `lg2.xcframework` from
+[holzschu/libgit2](https://github.com/holzschu/libgit2), built from
+[libgit2](https://libgit2.org/).
+
+libgit2 is licensed under GPL-2.0 with a linking exception. The exception
+allows linking libgit2 with independent modules and distributing the result
+under terms of your choice. Source: https://github.com/libgit2/libgit2/blob/main/COPYING
+
+## CPython
+
+The app embeds the prebuilt `python3_ios.xcframework` and the Python 3.9.10
+standard library from [holzschu/python3_ios](https://github.com/holzschu/python3_ios)
+and [a-shell](https://github.com/holzschu/a-shell).
+
+Python is licensed under the Python Software Foundation License Version 2.
+Source: https://docs.python.org/3/license.html
+
+## OpenSSL / libssh2
+
+Prebuilt XCFrameworks from
+[holzschu/openssl-apple](https://github.com/holzschu/openssl-apple) and
+[holzschu/libssh2-apple](https://github.com/holzschu/libssh2-apple).
+
+- OpenSSL — Apache License 2.0 (OpenSSL 3) / OpenSSL License (1.1).
+- libssh2 — BSD 3-Clause.
