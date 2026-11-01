@@ -9,7 +9,7 @@ options:
 
 settings:
   base:
-    SWIFT_VERSION: "5.9"
+    SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "15.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     SUPPORTS_MACCATALYST: "NO"
@@ -40,6 +40,7 @@ targets:
       - path: Resources/Assets.xcassets
       - path: Resources/commandDictionary.plist
       - path: Resources/extraCommandsDictionary.plist
+      - path: Resources/default-config.json
     dependencies:
       - framework: Vendor/ios_system.xcframework
         embed: true

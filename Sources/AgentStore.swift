@@ -18,6 +18,11 @@ enum AgentPaths {
         configDir.appendingPathComponent("opencode.json")
     }
 
+    /// User-editable OpenCode config, visible in the Files app at the workspace root.
+    static var userConfigFile: URL {
+        workspace.appendingPathComponent("config.json")
+    }
+
     static var stateDir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("OpenCodeAgent", isDirectory: true)
@@ -28,6 +33,28 @@ enum AgentPaths {
         try? fm.createDirectory(at: workspace, withIntermediateDirectories: true)
         try? fm.createDirectory(at: configDir, withIntermediateDirectories: true)
         try? fm.createDirectory(at: stateDir, withIntermediateDirectories: true)
+
+        let config = workspace.appendingPathComponent("config.json")
+        if !fm.fileExists(atPath: config.path),
+           let template = Bundle.main.url(forResource: "default-config", withExtension: "json"),
+           let data = try? Data(contentsOf: template) {
+            try? data.write(to: config, options: .atomic)
+        }
+
+        let agents = workspace.appendingPathComponent("AGENTS.md")
+        if !fm.fileExists(atPath: agents.path) {
+            let rules = """
+            # Правила для агента
+
+            - Работай только внутри папки OpenCode.
+            - Сначала прочитай relevant files, потом меняй.
+            - Не запускай node/npm/python/git — их нет на iOS.
+            - Для команд используй встроенный Unix-shell (ls, cat, grep, sed, awk, find, diff, tar).
+            - Отвечай на языке пользователя.
+            """
+            try? rules.write(to: agents, atomically: true, encoding: .utf8)
+        }
+
         let readme = workspace.appendingPathComponent("README.md")
         if !fm.fileExists(atPath: readme.path) {
             let text = """

@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Darwin
 
 /// A tiny on-device implementation of the opencode v1 HTTP surface, backed by
 /// OpenCode Zen and ios_system. The bundled web UI talks to it through WebBridge.
@@ -13,6 +14,13 @@ final class AgentEngine {
     private var running: [String: Task<Void, Never>] = [:]
     private let lock = NSRecursiveLock()
     private var initialized = false
+    private var agentPrompts: [String: String] = [:]
+    private var agentModels: [String: String] = [:]
+    private var agentDescriptions: [String: String] = [:]
+    private var agentModes: [String: String] = [:]
+    private var instructionText = ""
+    private var disabledTools: Set<String> = []
+    private var defaultAgent = "build"
 
     private init() {
         zen.onAuthEvent = { [weak self] event in
@@ -29,7 +37,116 @@ final class AgentEngine {
         initialized = true
         AgentPaths.prepare()
         _ = shell.hasCommand("ls")
+        reloadConfig()
         _ = zen.defaultModel()
+    }
+
+    func reloadConfig() {
+        let cfg = loadConfig()
+        var prompts: [String: String] = [:]
+        var models: [String: String] = [:]
+        var descriptions: [String: String] = [:]
+        var modes: [String: String] = [:]
+
+        func ingest(_ dict: [String: Any]) {
+            for (name, value) in dict {
+                guard let a = value as? [String: Any] else { continue }
+                if let p = a["prompt"] as? String ?? a["system"] as? String, !p.isEmpty { prompts[name] = p }
+                if let m = modelID(a["model"]) { models[name] = m }
+                if let d = a["description"] as? String { descriptions[name] = d }
+                if let m = a["mode"] as? String { modes[name] = m }
+            }
+        }
+        if let a = cfg["agents"] as? [String: Any] { ingest(a) }
+        if let a = cfg["agent"] as? [String: Any] { ingest(a) }
+        agentPrompts = prompts
+        agentModels = models
+        agentDescriptions = descriptions
+        agentModes = modes
+        if let d = cfg["default_agent"] as? String, !d.isEmpty { defaultAgent = d }
+
+        if let m = modelID(cfg["model"]) {
+            ServerConfig.shared.zenModel = m
+        }
+        if let providers = cfg["providers"] as? [String: Any],
+           let open = providers["opencode"] as? [String: Any],
+           let opts = open["options"] as? [String: Any],
+           let key = opts["apiKey"] as? String, !key.isEmpty, !key.hasPrefix("{env:") {
+            if ServerConfig.shared.zenKey != key { ServerConfig.shared.zenKey = key }
+        } else if let providers = cfg["provider"] as? [String: Any],
+                  let open = providers["opencode"] as? [String: Any],
+                  let opts = open["options"] as? [String: Any],
+                  let key = opts["apiKey"] as? String, !key.isEmpty, !key.hasPrefix("{env:") {
+            if ServerConfig.shared.zenKey != key { ServerConfig.shared.zenKey = key }
+        }
+
+        var disabled: Set<String> = []
+        if let rules = cfg["permissions"] as? [[String: Any]] {
+            for r in rules {
+                if (r["effect"] as? String) == "deny", let action = r["action"] as? String {
+                    disabled.insert(normalizePermission(action))
+                }
+            }
+        }
+        if let old = cfg["permission"] as? [String: Any] {
+            for (k, v) in old {
+                if let s = v as? String, s == "deny" { disabled.insert(normalizePermission(k)) }
+                if let d = v as? [String: Any], (d["*"] as? String) == "deny" { disabled.insert(normalizePermission(k)) }
+            }
+        }
+        if let tools = cfg["tools"] as? [String: Any] {
+            for (k, v) in tools where (v as? Bool) == false { disabled.insert(normalizePermission(k)) }
+        }
+        disabledTools = disabled
+
+        var chunks: [String] = []
+        if let list = cfg["instructions"] as? [String] {
+            for item in list {
+                chunks.append(contentsOf: readInstruction(item))
+            }
+        }
+        let agentsFile = AgentPaths.workspace.appendingPathComponent("AGENTS.md")
+        if FileManager.default.fileExists(atPath: agentsFile.path),
+           let txt = try? String(contentsOf: agentsFile, encoding: .utf8) {
+            chunks.append(txt)
+        }
+        var seen = Set<String>()
+        instructionText = chunks.filter { seen.insert($0).inserted }.joined(separator: "\n\n")
+    }
+
+    private func normalizePermission(_ key: String) -> String {
+        switch key {
+        case "write", "edit", "delete", "move", "mkdir": return "edit"
+        case "read", "list", "grep", "glob": return "read"
+        default: return key
+        }
+    }
+
+    private func modelID(_ value: Any?) -> String? {
+        if let s = value as? String, s.contains("/") { return String(s.split(separator: "/").last ?? "") }
+        if let obj = value as? [String: Any] {
+            if let m = obj["model"] as? String { return m }
+            if let m = obj["modelID"] as? String { return m }
+        }
+        return nil
+    }
+
+    private func readInstruction(_ item: String) -> [String] {
+        if item.hasPrefix("http://") || item.hasPrefix("https://") { return [] }
+        var path = item
+        if path.hasPrefix("./") { path.removeFirst(2) }
+        if path.hasSuffix("/**") { path.removeLast(3) }
+        guard let url = AgentPaths.resolve(path) else { return [] }
+        var urls: [URL] = []
+        if path.contains("*") {
+            let dir = url.deletingLastPathComponent()
+            if let list = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+                urls = list.filter { $0.pathExtension == "md" }
+            }
+        } else {
+            urls = [url]
+        }
+        return urls.compactMap { try? String(contentsOf: $0, encoding: .utf8) }.map { String($0.prefix(30_000)) }
     }
 
     // MARK: - SSE helpers
@@ -101,11 +218,7 @@ final class AgentEngine {
             return (200, ["orgs": []])
         }
         if route == "/agent" {
-            return (200, [
-                ["name": "build", "mode": "primary", "description": "Пишет код и меняет файлы"],
-                ["name": "plan", "mode": "primary", "description": "Только читает и планирует"],
-                ["name": "general", "mode": "subagent", "description": "Исследует проект"]
-            ])
+            return (200, agentsPayload())
         }
         if route == "/command" { return (200, []) }
         if route == "/project" || route == "/project/current" {
@@ -221,6 +334,10 @@ final class AgentEngine {
         }
 
         if parts.count >= 2 && parts[0] == "auth" && parts[1] == "opencode" {
+            if method == "DELETE" {
+                zen.logout()
+                return (200, true)
+            }
             if method == "PUT" {
                 if let key = payload["key"] as? String, !key.isEmpty {
                     zen.cancelLogin()
@@ -281,14 +398,20 @@ final class AgentEngine {
 
     private func loadConfig() -> [String: Any] {
         var cfg: [String: Any] = [:]
-        if let data = try? Data(contentsOf: AgentPaths.configFile),
+        let user = AgentPaths.userConfigFile
+        let internalCfg = AgentPaths.configFile
+        if let data = try? Data(contentsOf: user),
            let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
             cfg = obj
+        } else if let data = try? Data(contentsOf: internalCfg),
+                  let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            cfg = obj
         }
-        let current = cfg["model"] as? String ?? ""
-        if current.isEmpty {
+        let hasModel = (cfg["model"] as? String)?.isEmpty == false || cfg["model"] is [String: Any]
+        if !hasModel {
             cfg["model"] = "opencode/\(zen.defaultModel())"
         }
+        if cfg["plugins"] == nil { cfg["plugins"] = [] }
         if cfg["plugin"] == nil { cfg["plugin"] = [] }
         if cfg["mcp"] == nil { cfg["mcp"] = [:] }
         return cfg
@@ -298,12 +421,38 @@ final class AgentEngine {
         var cfg = loadConfig()
         patch.forEach { cfg[$0.key] = $0.value }
         if let data = try? JSONSerialization.data(withJSONObject: cfg, options: [.prettyPrinted]) {
-            try? data.write(to: AgentPaths.configFile, options: .atomic)
+            try? data.write(to: AgentPaths.userConfigFile, options: .atomic)
         }
+        reloadConfig()
         return cfg
     }
 
+    private func agentsPayload() -> [[String: Any]] {
+        var list: [[String: Any]] = [
+            ["name": "build", "mode": "primary", "description": agentDescriptions["build"] ?? "Пишет код и меняет файлы"],
+            ["name": "plan", "mode": "primary", "description": agentDescriptions["plan"] ?? "Только читает и планирует"],
+            ["name": "general", "mode": "subagent", "description": "Исследует проект"]
+        ]
+        for (name, mode) in agentModes where !["build", "plan", "general"].contains(name) {
+            list.append(["name": name, "mode": mode, "description": agentDescriptions[name] ?? ""])
+        }
+        for name in agentPrompts.keys where !["build", "plan", "general"].contains(name) && agentModes[name] == nil {
+            list.append(["name": name, "mode": "primary", "description": agentDescriptions[name] ?? ""])
+        }
+        list.sort { a, b in
+            let an = a["name"] as? String ?? ""
+            let bn = b["name"] as? String ?? ""
+            if an == defaultAgent { return true }
+            if bn == defaultAgent { return false }
+            let am = a["mode"] as? String == "subagent" ? 1 : 0
+            let bm = b["mode"] as? String == "subagent" ? 1 : 0
+            return am < bm
+        }
+        return list
+    }
+
     private func providersPayload() -> [String: Any] {
+        reloadConfig()
         var map: [String: Any] = [:]
         for m in zen.selectableModels { map[m.id] = m.ui }
         return [
@@ -419,9 +568,9 @@ final class AgentEngine {
     private func startPrompt(sessionID: String, body: [String: Any]) {
         guard let session = store.session(sessionID) else { return }
         let mid = body["messageID"] as? String ?? newID("msg_")
-        let agent = body["agent"] as? String ?? "build"
+        let agent = body["agent"] as? String ?? defaultAgent
         let modelObj = body["model"] as? [String: Any] ?? [:]
-        let modelID = modelObj["modelID"] as? String ?? modelFromConfig()
+        let modelID = modelObj["modelID"] as? String ?? agentModels[agent] ?? modelFromConfig()
         let providerID = modelObj["providerID"] as? String ?? "opencode"
         var parts = body["parts"] as? [[String: Any]] ?? []
         if parts.isEmpty, let text = body["text"] as? String {
@@ -644,10 +793,11 @@ final class AgentEngine {
 
     private func systemPrompt(agent: String) -> String {
         let mode = agent == "plan"
-            ? "Ты в режиме plan: только анализируй и планируй, не меняй файлы."
-            : "Ты в режиме build: можешь читать и менять файлы, выполнять команды."
-        return """
-        Ты OpenCode — AI-агент для программирования, работающий полностью на iPhone.
+            ? "Режим plan: только анализируй, ищи и планируй. Не меняй файлы и не выполняй изменяющие команды."
+            : "Режим build: можешь читать и менять файлы, выполнять команды."
+        let base = agentPrompts[agent] ?? "Ты OpenCode — AI-агент для программирования."
+        let rules = """
+        Ты работаешь полностью на iPhone, в песочнице приложения.
         Рабочая папка: \(AgentPaths.workspace.path)
         \(mode)
 
@@ -660,6 +810,8 @@ final class AgentEngine {
         Для многошаговых задач используй todowrite.
         Отвечай на языке пользователя, кратко и по делу. Код — в блоках ```.
         """
+        if instructionText.isEmpty { return base + "\n\n" + rules }
+        return base + "\n\n" + rules + "\n\nПравила проекта:\n" + String(instructionText.prefix(60_000))
     }
 
     private func buildProviderMessages(sessionID: String, system: String) -> [[String: Any]] {
@@ -771,10 +923,17 @@ final class AgentEngine {
             tools.append(fn("move", "Переместить/переименовать файл.", ["from": str, "to": str], ["from", "to"]))
             tools.append(fn("mkdir", "Создать папку.", ["path": str], ["path"]))
         }
-        return tools
+        return tools.filter { item in
+            guard let fn = item["function"] as? [String: Any],
+                  let name = fn["name"] as? String else { return true }
+            return !disabledTools.contains(normalizePermission(name))
+        }
     }
 
     private func executeTool(name: String, input: [String: Any], sessionID: String) async -> ToolOutcome {
+        if disabledTools.contains(normalizePermission(name)) {
+            return ToolOutcome(output: "", metadata: nil, error: "Инструмент \(name) запрещён в config.json")
+        }
         switch name {
         case "bash":
             let cmd = input["command"] as? String ?? ""

@@ -3,21 +3,20 @@ const O=window.OCM,h=O.h,S=O.S,api=O.api,bus=O.bus;
 const CFG='/root/.config/opencode';
 const cfg={read(){const t=O.native.cfgRead();if(!t.trim())return{obj:{},raw:''};try{return{obj:O.parseJsonc(t),raw:t}}catch(e){return{obj:null,raw:t,err:e.message}}},
   write(o){return O.native.cfgWrite(typeof o==='string'?o:JSON.stringify(o,null,2))}};
-const restartBar=()=>h('button',{class:'btn wide',style:{marginTop:'12px'},onclick:()=>{OC.restartServer();O.toast('Перезапуск сервера...');O.back()}},O.icon('refresh'),'Перезапустить сервер для применения');
+const restartBar=()=>h('div',{class:'note',style:{marginTop:'12px'}},'Изменения config.json применяются сразу. Агент работает локально на устройстве.');
 const sub=(t,b,o)=>O.sheet(t,b,Object.assign({full:true},o));
 
 // ---- main ----
 O.openSettings=()=>{
   const st=O.native.state(),fl=st.flags||{};
   const body=h('div');const s=O.sheet('Настройки',body);
-  // профиль: у каждого гостя — свой случайный ник и пароль (никогда общий аккаунт)
   const prof=h('div',{class:'card',style:{display:'flex',alignItems:'center',gap:'10px'}},
-    O.icon('user'),
+    O.icon('folder'),
     h('div',{class:'grow'},
-      h('b',null,st.name||'Гость'),
-      h('div',{class:'mut s'},st.guest?('Гостевой профиль · ник создан случайно'):(st.user?('Профиль: '+st.user):'Профиль не выбран')),
-      st.guest&&st.pw?h('div',{class:'mut s',style:{display:'flex',alignItems:'center',gap:'6px'}},h('span',{class:'mono'},'Пароль профиля: '+st.pw),h('button',{class:'ibtn s',onclick:()=>O.native.copy(st.pw)},O.icon('copy'))):null),
-    h('button',{class:'btn sm',onclick:async()=>{if(await O.confirm('Сменить профиль?','Чаты и файлы останутся на телефоне и будут доступны при повторном входе.','Сменить'))OC.signOut()}},O.icon('out'),'Сменить'));
+      h('b',null,'OpenCode iPhone'),
+      h('div',{class:'mut s'},'Workspace: '+(S.dir||'OpenCode')),
+      h('div',{class:'mut s'},st.user&&st.user!=='Локальный режим'?('Аккаунт: '+st.user):'Без входа — доступны бесплатные модели')),
+    h('button',{class:'btn sm',onclick:()=>O.openProjects()},O.icon('folder'),'Проекты'));
   body.append(prof);
   const g=t=>body.append(h('div',{class:'grp'},t)),r=(i,t,sb,fn)=>body.append(O.listRow(i,t,sb,O.icon('chevR'),fn));
   g('Аккаунт opencode');
@@ -33,11 +32,9 @@ O.openSettings=()=>{
   g('Звуки и уведомления');
   [['snd_done','Задача завершена','Агент закончил работу','done'],['snd_action','Требуется действие','Ожидается разрешение или вопрос','action'],['snd_quota','Квота исчерпана','Превышен лимит модели или запросов','quota']].forEach(([k,t,d,kind])=>
     body.append(h('div',{style:{display:'flex',alignItems:'center'}},h('div',{class:'grow'},O.toggleRow('bell',t,d,fl[k]!==false,v=>OC.setFlag(k,v))),h('button',{class:'ibtn',onclick:()=>OC.testSound(kind)},O.icon('play')))));
-  g('Агенты');r('doc','Агенты и правила','Загрузите AGENTS.md, агентов и команды',()=>openAgents());
-  r('server','Серверы MCP','Добавить, изменить, подключить',()=>O.openMcp());r('plug','Плагины','npm-пакеты и локальные файлы',()=>O.openPlugins());
-  r('code','Файл конфигурации','Редактировать opencode.json напрямую',()=>openConfig());
-  g('Приложение');r('down','Обновления','Приложение и ядро OpenCode (1.x)',()=>openUpdates());r('shield','Разрешения','Файлы, уведомления, фон, установка',()=>openPerms());
-  r('bat','Совместимость и логи','Безопасный режим, перезапуск сервера',()=>openCompat());r('info','О приложении','',()=>openAbout());
+  g('Конфигурация');r('code','config.json','Модель, агенты, permissions, instructions',()=>openConfig());
+  r('doc','AGENTS.md','Правила проекта — редактируются в файловом редакторе',()=>editFile('/root/AGENTS.md','AGENTS.md'));
+  g('Приложение');r('bat','Диагностика','Workspace, модель, терминал, лог',()=>openCompat());r('info','О приложении','',()=>openAbout());
   r('globe','OpenCode CLI-агент (Warp)','docs.warp.dev/agents/cli-agents/opencode',()=>O.openUrl('https://docs.warp.dev/agents/cli-agents/opencode/'));
   r('tg','Сообщество','t.me/OpenCodeMob',()=>O.openUrl('https://t.me/OpenCodeMob'))};
 
@@ -101,9 +98,9 @@ O.openPlugins=()=>{const body=h('div');const s=sub('Плагины',body);
   draw();O.on('picked',()=>{if(s.root.isConnected)draw()})};
 
 // ---- raw config ----
-function openConfig(){const c=cfg.read();const ta=h('textarea',{class:'mono',rows:20,spellcheck:'false'});ta.value=c.raw||'{\n}\n';
-  sub('opencode.json',h('div',null,c.err?h('div',{class:'errbox'},c.err):null,ta,h('button',{class:'btn pri wide',style:{marginTop:'8px'},onclick:()=>{try{O.parseJsonc(ta.value||'{}')}catch(e){return O.toast('Неверный JSON: '+e.message,4000)}
-    const w=cfg.write(ta.value);w.ok?O.toast('Сохранено',1200):O.toast(w.err||'Не удалось')}},'Сохранить'),restartBar()))}
+function openConfig(){const c=cfg.read();const ta=h('textarea',{class:'mono',rows:22,spellcheck:'false'});ta.value=c.raw||'{\n}\n';
+  sub('config.json',h('div',null,h('div',{class:'note',style:{marginBottom:'8px'}},'Файл лежит в OpenCode/config.json и виден в приложении «Файлы». После сохранения модель и permissions применяются сразу.'),c.err?h('div',{class:'errbox'},c.err):null,ta,h('button',{class:'btn pri wide',style:{marginTop:'8px'},onclick:()=>{try{O.parseJsonc(ta.value||'{}')}catch(e){return O.toast('Неверный JSON: '+e.message,4000)}
+    const w=cfg.write(ta.value);if(w.ok){O.toast('Сохранено',1200);O.loadMeta().then(()=>O.pickDefaults())}else O.toast(w.err||'Не удалось')}},'Сохранить'),restartBar()))}
 
 // ---- updates ----
 let updUI=null;
@@ -131,15 +128,18 @@ function openPerms(){const box=h('div',null,O.permRows());const s=sub('Разр�
 O.on('perms',()=>{if(permUI)permUI()});
 
 // ---- compatibility / about ----
-function openCompat(){const fl=O.native.state().flags||{};
-  sub('Совместимость и логи',h('div',null,O.toggleRow('shield','Безопасный режим (без seccomp)','Медленнее, но помогает, если сервер не запускается на некоторых телефонах',fl.noseccomp,v=>OC.setFlag('noseccomp',v)),
-    h('button',{class:'btn wide',style:{marginTop:'10px'},onclick:()=>{OC.restartServer();O.toast('Перезапуск сервера...')}},O.icon('refresh'),'Перезапустить сервер'),
-    h('button',{class:'btn wide',style:{marginTop:'8px'},onclick:()=>{const t=OC.readLog();sub('Лог сервера',h('pre',{class:'term-pre',style:{maxHeight:'none'}},t||'(пусто)'))}},O.icon('terminal'),'Смотреть лог сервера')))}
+function openCompat(){const st=O.native.state();
+  sub('Диагностика',h('div',null,
+    O.listRow('folder','Workspace',S.dir||'OpenCode',null,()=>O.openProjects()),
+    O.listRow('cpu','Модель',(S.model?S.model.providerID+'/'+S.model.modelID:'не выбрана'),null,()=>O.openModels()),
+    O.listRow('terminal','Терминал','ios_system · реальные Unix-команды',null,()=>{O.back();O.setTab('term')}),
+    O.listRow('server','Режим','Полностью на устройстве, без сервера',null,null),
+    h('button',{class:'btn wide',style:{marginTop:'10px'},onclick:()=>{const t=OC.readLog();sub('Лог',h('pre',{class:'term-pre',style:{maxHeight:'none'}},t||'(пусто)'))}},O.icon('terminal'),'Смотреть лог')))}
 function openAbout(){const st=O.native.state();
-  sub('О приложении',h('div',null,h('div',{class:'center',style:{minHeight:0,padding:'16px 0'}},O.logo(40),h('b',{style:{fontSize:'20px'}},'OpenCode'),h('div',{class:'mut'},'Версия '+st.version),h('div',{class:'mut s'},'Ядро '+(st.core||'неизвестно')+' (1.x)')),
-    h('div',{class:'note'},'OpenCode Mobile упаковывает CLI OpenCode 1.x (лицензия MIT) в Android-приложение. Оно создано не командой OpenCode и никак с ней не связано.'),
-    h('div',{class:'note',style:{marginTop:'10px'}},'OpenCode как CLI-агент есть и у Warp — документация: docs.warp.dev/agents/cli-agents/opencode.'),
-    h('button',{class:'btn wide',style:{marginTop:'12px'},onclick:()=>O.openUrl('https://docs.warp.dev/agents/cli-agents/opencode/')},O.icon('globe'),'OpenCode CLI-агент (Warp)'),
+  sub('О приложении',h('div',null,h('div',{class:'center',style:{minHeight:0,padding:'16px 0'}},O.logo(40),h('b',{style:{fontSize:'20px'}},'OpenCode'),h('div',{class:'mut'},'Версия '+st.version),h('div',{class:'mut s'},'iOS · on-device agent')),
+    h('div',{class:'note'},'OpenCode Mobile для iPhone: локальный workspace, файловый агент и Unix-терминал на ios_system. Не связан с командой OpenCode.'),
+    h('div',{class:'note',style:{marginTop:'10px'}},'Ограничение iOS: нельзя запускать node, python, git и произвольные бинарники. Терминал использует встроенный набор команд.'),
+    h('button',{class:'btn wide',style:{marginTop:'12px'},onclick:()=>O.openUrl('https://opencode.ai')},O.icon('globe'),'opencode.ai'),
     h('button',{class:'btn wide',style:{marginTop:'8px'},onclick:()=>O.openUrl('https://t.me/OpenCodeMob')},O.icon('tg'),'t.me/OpenCodeMob')))}
 O.on('signedout',()=>location.reload());
 

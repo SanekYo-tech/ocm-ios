@@ -1,0 +1,102 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "username": "He",
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/big-pickle",
+  "default_agent": "build",
+  "shell": "sh",
+  "update": "disable",
+  "share": "disabled",
+  "snapshots": true,
+  "compaction": {
+    "auto": true
+  },
+  "watcher": {
+    "ignore": [
+      ".git/**",
+      "node_modules/**",
+      ".opencode/**"
+    ]
+  },
+  "permissions": [
+    {
+      "action": "read",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "list",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grep",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "glob",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "edit",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "bash",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "webfetch",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "deny"
+    }
+  ],
+  "agents": {
+    "build": {
+      "description": "Пишет код, меняет файлы и выполняет команды",
+      "mode": "primary",
+      "model": "opencode/big-pickle",
+      "system": "Ты OpenCode. Работай аккуратно, сначала изучай файлы, потом меняй. Используй инструменты. Отвечай на языке пользователя."
+    },
+    "plan": {
+      "description": "Только читает и планирует изменения",
+      "mode": "primary",
+      "model": "opencode/big-pickle",
+      "system": "Ты OpenCode в режиме plan. Только анализируй, ищи и планируй. Не меняй файлы и не выполняй изменяющие команды."
+    }
+  },
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "mcp": {},
+  "plugins": [],
+  "plugin": [],
+  "providers": {
+    "opencode": {
+      "options": {
+        "baseURL": "https://opencode.ai/inference/openai/v1",
+        "apiKey": ""
+      }
+    }
+  },
+  "provider": {
+    "opencode": {
+      "options": {
+        "baseURL": "https://opencode.ai/inference/openai/v1",
+        "apiKey": ""
+      }
+    }
+  },
+  "experimental": {
+    "policies": []
+  }
+}

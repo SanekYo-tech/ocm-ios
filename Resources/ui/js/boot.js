@@ -15,7 +15,7 @@ function enterThen(fn){
 }
 function welcome(msg){
   const st=O.native.state()||{};
-  const signed=st.user&&st.user!==''&&st.name==='OpenCode iPhone'?st.user:'';
+  const signed=st.user&&st.user!=='Локальный режим'?st.user:'';
   screen(logo(),
     h('b',{style:{fontSize:'20px'}},'OpenCode на iPhone'),
     h('p',{class:'mut'},'Полностью на устройстве: файлы, терминал и AI-агент. Компьютер не нужен.'),

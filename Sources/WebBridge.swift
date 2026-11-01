@@ -41,6 +41,11 @@ final class WebBridge: NSObject, WKUIDelegate {
     private var lastNotification = Date.distantPast
     private var notificationsRequested = false
     private let agent = AgentEngine.shared
+    private let shell = ShellRunner.shared
+    private var terminalID: String?
+    private var terminalCwd = AgentPaths.workspace.path
+    private var terminalBuffer = ""
+    private var terminalBusy = false
 
     // MARK: - prompt bridge
 
@@ -90,15 +95,15 @@ final class WebBridge: NSObject, WKUIDelegate {
         case "sseStop":
             return nil
         case "wsOpen":
-            guard args.count >= 2, let id = args[0] as? String, let path = args[1] as? String else { return nil }
-            openSocket(id: id, path: path)
+            guard args.count >= 2, let id = args[0] as? String else { return nil }
+            openLocalTerminal(id: id)
             return nil
         case "wsSend":
             guard args.count >= 2, let id = args[0] as? String, let text = args[1] as? String else { return nil }
-            sendSocket(id: id, text: text)
+            if id == terminalID { terminalInput(text) }
             return nil
         case "wsClose":
-            if let id = args.first as? String { closeSocket(id: id) }
+            if let id = args.first as? String { closeLocalTerminal(id: id) }
             return nil
         case "ls":
             if let path = args.first as? String { return localLS(path) }
@@ -117,7 +122,7 @@ final class WebBridge: NSObject, WKUIDelegate {
             }
             return jsonString(["ok": false, "err": "Некорректный вызов"])
         case "cfgRead":
-            let cfg = AgentPaths.configFile
+            let cfg = AgentPaths.userConfigFile
             return (try? String(contentsOf: cfg, encoding: .utf8)) ?? ""
         case "cfgWrite":
             if let text = args.first as? String { return localWriteConfig(text) }
@@ -626,6 +631,95 @@ final class WebBridge: NSObject, WKUIDelegate {
         emit("sse", ["t": "data", "d": json])
     }
 
+    // MARK: - local terminal (ios_system)
+
+    private func ws(_ id: String, _ type: String, _ data: String? = nil) {
+        var payload: [String: Any] = ["id": id, "t": type]
+        if let data { payload["d"] = data }
+        emit("ws", payload)
+    }
+
+    private func promptText() -> String {
+        let rel = AgentPaths.relative(URL(fileURLWithPath: terminalCwd))
+        return "opencode:\(rel.isEmpty ? "/" : "/" + rel)$ "
+    }
+
+    private func openLocalTerminal(id: String) {
+        terminalID = id
+        terminalBuffer = ""
+        terminalCwd = AgentPaths.workspace.path
+        ws(id, "open")
+        let welcome = "OpenCode shell · ios_system\r\nWorkspace: \(AgentPaths.workspace.path)\r\nВведите help для списка команд. exit — закрыть сессию.\r\n\r\n" + promptText()
+        ws(id, "msg", welcome)
+    }
+
+    private func closeLocalTerminal(id: String) {
+        if terminalID == id { terminalID = nil }
+        ws(id, "close")
+    }
+
+    private func terminalInput(_ text: String) {
+        guard let id = terminalID else { return }
+        for ch in text {
+            if ch == "\r" || ch == "\n" {
+                ws(id, "msg", "\r\n")
+                let cmd = terminalBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                terminalBuffer = ""
+                if cmd.isEmpty { ws(id, "msg", promptText()); continue }
+                if cmd == "exit" { ws(id, "msg", "logout\r\n"); closeLocalTerminal(id: id); continue }
+                if cmd == "clear" { ws(id, "msg", "\u{001B}[2J\u{001B}[H" + promptText()); continue }
+                if cmd == "help" {
+                    ws(id, "msg", "Доступно: ls, cat, cd, pwd, echo, grep, sed, awk, find, sort, uniq, wc, diff, cp, mv, rm, mkdir, touch, chmod, tar, gzip, date, env, xargs.\r\nНет node, npm, python, git и компиляторов.\r\n" + promptText())
+                    continue
+                }
+                if cmd == "pwd" { ws(id, "msg", terminalCwd + "\r\n" + promptText()); continue }
+                if cmd.hasPrefix("cd ") {
+                    let target = String(cmd.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                    if let newDir = AgentPaths.resolve(target.hasPrefix("/") ? target : terminalCwd + "/" + target) {
+                        var isDir: ObjCBool = false
+                        if FileManager.default.fileExists(atPath: newDir.path, isDirectory: &isDir), isDir.boolValue {
+                            terminalCwd = newDir.path
+                            ws(id, "msg", promptText())
+                        } else {
+                            ws(id, "msg", "cd: no such directory\r\n" + promptText())
+                        }
+                    } else {
+                        ws(id, "msg", "cd: outside workspace\r\n" + promptText())
+                    }
+                    continue
+                }
+                terminalBusy = true
+                ws(id, "msg", "")
+                shell.runAsync(cmd, cwd: terminalCwd, timeout: 120) { [weak self] code, output in
+                    guard let self, self.terminalID == id else { return }
+                    var out = output.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\n", with: "\r\n")
+                    if !out.isEmpty && !out.hasSuffix("\r\n") { out += "\r\n" }
+                    if !out.isEmpty { self.ws(id, "msg", out) }
+                    if code != 0 { self.ws(id, "msg", "[код \(code)]\r\n") }
+                    self.terminalBusy = false
+                    self.ws(id, "msg", self.promptText())
+                }
+            } else if ch == "\u{7F}" || ch == "\u{8}" {
+                if !terminalBuffer.isEmpty {
+                    terminalBuffer.removeLast()
+                    ws(id, "msg", "\u{8} \u{8}")
+                }
+            } else if ch == "\u{3}" {
+                terminalBuffer = ""
+                if terminalBusy { shell.kill() }
+                ws(id, "msg", "^C\r\n" + promptText())
+            } else if ch == "\t" {
+                terminalBuffer += "  "
+                ws(id, "msg", "  ")
+            } else if ch.unicodeScalars.first.map({ $0.value >= 32 }) == true {
+                if terminalBuffer.count < 4000 {
+                    terminalBuffer.append(ch)
+                    ws(id, "msg", String(ch))
+                }
+            }
+        }
+    }
+
     func emitAuth(_ payload: [String: Any]) {
         emit("authlogin", payload)
     }
@@ -723,8 +817,8 @@ final class WebBridge: NSObject, WKUIDelegate {
             return jsonString(["ok": false, "err": "Неверный JSON"])
         }
         do {
-            try FileManager.default.createDirectory(at: AgentPaths.configDir, withIntermediateDirectories: true)
-            try data.write(to: AgentPaths.configFile, options: .atomic)
+            try data.write(to: AgentPaths.userConfigFile, options: .atomic)
+            AgentEngine.shared.reloadConfig()
             return jsonString(["ok": true])
         } catch {
             return jsonString(["ok": false, "err": shortError(error)])
