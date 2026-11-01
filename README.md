@@ -29,6 +29,7 @@
 - **Рабочая папка `OpenCode`** — видна в приложении «Файлы» → «На iPhone» → «OpenCode». Кладите туда проекты, агент читает и меняет их.
 - **AI-агент** — чат с историей, сессиями, инструментами чтения/записи/поиска файлов и списком задач.
 - **Настоящий Unix-терминал** — `ls`, `cat`, `grep`, `sed`, `awk`, `find`, `sort`, `uniq`, `wc`, `diff`, `cp`, `mv`, `rm`, `mkdir`, `tar`, `gzip` и другие команды через [ios_system](https://github.com/holzschu/ios_system) (движок a-Shell). Без эмуляции и без ПК.
+- **Git** — встроенный libgit2: `init`, `status`, `add`, `reset`, `commit -m`, `log`, `diff`, `branch`, `checkout`, `rev-parse`, `remote`, `config`, `clone`.
 - **OpenCode Zen** — бесплатный режим `Bearer public`, вход в аккаунт OpenCode через device-flow (Google/GitHub в Safari) или свой API-ключ.
 - **Мобильный интерфейс OpenCode** — чат, дерево файлов, редактор, изменения, модели, темы. UI из Android-версии, адаптированный под WKWebView.
 

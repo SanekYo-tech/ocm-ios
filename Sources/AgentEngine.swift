@@ -39,6 +39,10 @@ final class AgentEngine {
         _ = shell.hasCommand("ls")
         reloadConfig()
         _ = zen.defaultModel()
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5) {
+            let (code, output) = ShellRunner.shared.run("pwd; echo ---; ls -la", timeout: 15)
+            NSLog("OCM shell self-test exit=\(code) output=\(output.prefix(2000))")
+        }
     }
 
     func reloadConfig() {
@@ -476,7 +480,7 @@ final class AgentEngine {
                                                                   options: [.skipsHiddenFiles])) ?? []
         return items.compactMap { url in
             let rel = AgentPaths.relative(url)
-            if rel.hasPrefix(".opencode") { return nil }
+            if rel.hasPrefix(".opencode") || rel.hasPrefix(".git") { return nil }
             let values = try? url.resourceValues(forKeys: Set(keys))
             let isDirectory = values?.isDirectory ?? false
             return [
@@ -555,7 +559,7 @@ final class AgentEngine {
                                                     options: [.skipsHiddenFiles]) else { return out }
         for case let url as URL in e {
             let rel = AgentPaths.relative(url)
-            if rel.hasPrefix(".opencode") || rel.contains("node_modules/") || rel.contains(".git/") { continue }
+            if rel.hasPrefix(".opencode") || rel.hasPrefix(".git") || rel.contains("node_modules/") || rel.contains(".git/") { continue }
             if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { continue }
             out.append(url)
             if out.count > 3000 { break }
@@ -805,7 +809,8 @@ final class AgentEngine {
 
         У тебя есть настоящий Unix-shell (ios_system) и файловые инструменты.
         Доступны команды: ls, cat, head, tail, grep, egrep, sed, awk, sort, uniq, wc, cut, tr, diff, find, xargs, cp, mv, rm, mkdir, rmdir, touch, chmod, stat, du, df, tar, gzip, gunzip, date, echo, env, pwd, tee, uname, whoami, bc.
-        Недоступны: node, npm, python, git, компиляторы, установка пакетов. Не пытайся их запускать.
+        Git работает через встроенный libgit2: git init, status, add, reset, commit -m, log, diff, branch, checkout, rev-parse, remote, config, clone. Для pull/push используй веб-поиск/ручное управление, они не поддерживаются.
+        Недоступны: node, npm, python, компиляторы, установка пакетов. Не пытайся их запускать.
         Для правок используй инструменты edit/write; для осмотра — read/list/grep/bash.
         Все пути — внутри рабочей папки. Не выходи за её пределы.
         Сначала изучи файлы, потом меняй. Делай минимальные аккуратные изменения.
