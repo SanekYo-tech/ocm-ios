@@ -25,6 +25,13 @@ final class ShellRunner {
         var code: Int32 = 1
         var output = ""
         queue.async {
+            if OCMPythonIsCommand(command) {
+                let text = OCMPythonRun(command, cwd ?? AgentPaths.workspace.path) ?? ""
+                code = Int32(OCMPythonLastExit())
+                output = text
+                sem.signal()
+                return
+            }
             if OCMGitIsCommand(command) {
                 let text = OCMGitRun(command, cwd ?? AgentPaths.workspace.path) ?? ""
                 code = Int32(OCMGitLastExit())
@@ -50,6 +57,12 @@ final class ShellRunner {
                   completion: @escaping (Int32, String) -> Void) {
         ensureInit()
         queue.async {
+            if OCMPythonIsCommand(command) {
+                let text = OCMPythonRun(command, cwd ?? AgentPaths.workspace.path) ?? ""
+                let code = Int32(OCMPythonLastExit())
+                DispatchQueue.main.async { completion(code, text) }
+                return
+            }
             if OCMGitIsCommand(command) {
                 let text = OCMGitRun(command, cwd ?? AgentPaths.workspace.path) ?? ""
                 let code = Int32(OCMGitLastExit())

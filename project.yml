@@ -26,7 +26,7 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: "NO"
     SWIFT_OBJC_BRIDGING_HEADER: "Sources/Bridging-Header.h"
     CLANG_ENABLE_MODULES: "YES"
-    HEADER_SEARCH_PATHS: "$(inherited) Vendor/libgit2/include"
+    HEADER_SEARCH_PATHS: "$(inherited) Vendor/libgit2/include Vendor/python39include"
     LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
 
 targets:
@@ -37,6 +37,8 @@ targets:
     sources:
       - path: Sources
       - path: Resources/ui
+        type: folder
+      - path: Resources/python
         type: folder
       - path: Resources/Assets.xcassets
       - path: Resources/commandDictionary.plist
@@ -62,6 +64,9 @@ targets:
         embed: true
         link: false
       - framework: Vendor/lg2.xcframework
+        embed: true
+        link: true
+      - framework: Vendor/python39.xcframework
         embed: true
         link: true
     settings:

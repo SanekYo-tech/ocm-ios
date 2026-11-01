@@ -810,7 +810,8 @@ final class AgentEngine {
         У тебя есть настоящий Unix-shell (ios_system) и файловые инструменты.
         Доступны команды: ls, cat, head, tail, grep, egrep, sed, awk, sort, uniq, wc, cut, tr, diff, find, xargs, cp, mv, rm, mkdir, rmdir, touch, chmod, stat, du, df, tar, gzip, gunzip, date, echo, env, pwd, tee, uname, whoami, bc.
         Git работает через встроенный libgit2: git init, status, add, reset, commit -m, log, diff, branch, checkout, rev-parse, remote, config, clone. Для pull/push используй веб-поиск/ручное управление, они не поддерживаются.
-        Недоступны: node, npm, python, компиляторы, установка пакетов. Не пытайся их запускать.
+        Python 3.9.10 работает локально: python3 script.py, python3 -c "код". Есть стандартная библиотека; нет pip, ssl, sqlite3, numpy и компиляторов.
+        Недоступны: node, npm, компиляторы, установка пакетов. Не пытайся их запускать.
         Для правок используй инструменты edit/write; для осмотра — read/list/grep/bash.
         Все пути — внутри рабочей папки. Не выходи за её пределы.
         Сначала изучи файлы, потом меняй. Делай минимальные аккуратные изменения.

@@ -30,6 +30,7 @@
 - **AI-агент** — чат с историей, сессиями, инструментами чтения/записи/поиска файлов и списком задач.
 - **Настоящий Unix-терминал** — `ls`, `cat`, `grep`, `sed`, `awk`, `find`, `sort`, `uniq`, `wc`, `diff`, `cp`, `mv`, `rm`, `mkdir`, `tar`, `gzip` и другие команды через [ios_system](https://github.com/holzschu/ios_system) (движок a-Shell). Без эмуляции и без ПК.
 - **Git** — встроенный libgit2: `init`, `status`, `add`, `reset`, `commit -m`, `log`, `diff`, `branch`, `checkout`, `rev-parse`, `remote`, `config`, `clone`.
+- **Python 3.9.10** — локальный интерпретатор со стандартной библиотекой: `python3 script.py`, `python3 -c "..."`. Без pip, ssl/sqlite3 и компиляторов.
 - **OpenCode Zen** — бесплатный режим `Bearer public`, вход в аккаунт OpenCode через device-flow (Google/GitHub в Safari) или свой API-ключ.
 - **Мобильный интерфейс OpenCode** — чат, дерево файлов, редактор, изменения, модели, темы. UI из Android-версии, адаптированный под WKWebView.
 
@@ -38,8 +39,9 @@
 iOS не разрешает запускать произвольные бинарники и фоновые Linux-процессы. Поэтому:
 
 - нет `opencode serve` и proot внутри приложения;
-- нет Node.js/npm, Python, git и компиляторов;
-- агент не запускает `npm test`, `cargo build` или `git commit`;
+- нет Node.js/npm и компиляторов;
+- Python 3.9 и git работают через встроенные libgit2/CPython, но без pip, ssl/sqlite3 и сборки нативных пакетов;
+- агент не запускает `npm test` или `cargo build`;
 - вместо этого — встроенный Unix-набор `ios_system` и файловые инструменты;
 - приложение не работает в фоне как сервер (iOS усыпляет процесс).
 
