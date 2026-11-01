@@ -8,8 +8,8 @@ permissions:
 
 jobs:
   smoke:
-    runs-on: macos-15-intel
-    timeout-minutes: 30
+    runs-on: macos-26
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
