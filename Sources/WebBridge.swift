@@ -689,7 +689,6 @@ final class WebBridge: NSObject, WKUIDelegate {
                     continue
                 }
                 terminalBusy = true
-                ws(id, "msg", "")
                 shell.runAsync(cmd, cwd: terminalCwd, timeout: 120) { [weak self] code, output in
                     guard let self, self.terminalID == id else { return }
                     var out = output.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\n", with: "\r\n")

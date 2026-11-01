@@ -709,7 +709,8 @@ final class AgentEngine {
                 }
                 if var p = reasoningPart {
                     p["text"] = reasoning
-                    p["time"] = ["start": (p["time"] as? [String: Any])?["start"] ?? nowMs(), "end": nowMs()]
+                    let started = ((p["time"] as? [String: Any])?["start"] as? NSNumber)?.int64Value ?? nowMs()
+                    p["time"] = ["start": started, "end": nowMs()]
                     p["sessionID"] = sessionID; p["messageID"] = assistantID
                     store.updateMessage(sessionID, assistantID, part: p)
                     emitPart(sessionID, assistantID, p)
@@ -731,7 +732,7 @@ final class AgentEngine {
                         "status": outcome.error == nil ? "completed" : "error",
                         "input": input,
                         "title": call.name,
-                        "time": ["start": (part["state"] as? [String: Any])?["time"] as? [String: Any] ?? [:], "end": nowMs()],
+                        "time": ["start": ((part["state"] as? [String: Any])?["time"] as? [String: Any])?["start"] as? Int64 ?? nowMs(), "end": nowMs()],
                         "output": outcome.output
                     ]
                     if let err = outcome.error { state["error"] = err }
@@ -743,7 +744,7 @@ final class AgentEngine {
                 }
 
                 var completed = info
-                completed["time"] = ["created": (info["time"] as? [String: Any])?["created"] ?? nowMs(), "completed": nowMs()]
+                completed["time"] = ["created": ((info["time"] as? [String: Any])?["created"] as? NSNumber)?.int64Value ?? nowMs(), "completed": nowMs()]
                 completed["tokens"] = [
                     "input": totalInput, "output": totalOutput,
                     "reasoning": totalReasoning,
@@ -777,7 +778,7 @@ final class AgentEngine {
                     message = shortError(error)
                 }
                 var failed = info
-                failed["time"] = ["created": (info["time"] as? [String: Any])?["created"] ?? nowMs(), "completed": nowMs()]
+                failed["time"] = ["created": ((info["time"] as? [String: Any])?["created"] as? NSNumber)?.int64Value ?? nowMs(), "completed": nowMs()]
                 failed["error"] = ["name": "ProviderError", "data": ["message": message]]
                 store.updateMessage(sessionID, assistantID, info: failed)
                 emitMessage(sessionID, failed)
@@ -1078,9 +1079,11 @@ final class AgentEngine {
             if results.count >= 500 { break }
             let rel = AgentPaths.relative(url)
             if rel.hasPrefix(".opencode") { continue }
-            if fnmatch(pattern, rel, 0) == 0 || fnmatch(pattern, url.lastPathComponent, 0) == 0 {
-                results.append(rel)
+            let matches = pattern.withCString { p in
+                rel.withCString { s in fnmatch(p, s, 0) == 0 }
+                    || url.lastPathComponent.withCString { s in fnmatch(p, s, 0) == 0 }
             }
+            if matches { results.append(rel) }
         }
         return ToolOutcome(output: results.isEmpty ? "Файлы не найдены" : results.joined(separator: "\n"),
                            metadata: ["count": results.count], error: nil)
