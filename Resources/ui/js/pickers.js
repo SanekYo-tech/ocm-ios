@@ -99,6 +99,7 @@ O.openConnect=async()=>{
         api('POST','/provider/'+p.id+'/oauth/callback',{method:x.i},{timeout:900000}).then(()=>{if(sh.root.isConnected){sh.close();after()}}).catch(e=>{if(sh.root.isConnected)O.toast(e.message)})}
     }catch(e){view.textContent=e.message}};
   const disconnect=async p=>{try{await api('DELETE','/auth/'+p.id);try{await api('POST','/instance/dispose',null)}catch{}await O.loadMeta();conn.delete(p.id);draw();O.toast('Отключено')}catch(e){O.toast(e.message)}};
+};
 
 // ---- status: MCP / LSP / plugins ----
 O.openStatus=async()=>{
