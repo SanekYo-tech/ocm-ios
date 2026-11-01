@@ -1,0 +1,93 @@
+name: Simulator smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1 || true)"
+          if [ -z "$XCODE_APP" ]; then XCODE_APP="$(ls -d /Applications/Xcode*.app | sort -V | tail -n1)"; fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          set -euo pipefail
+          PREFIX="$RUNNER_TEMP/xcodegen-prefix"
+          mkdir -p "$PREFIX"
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
+          bash "$RUNNER_TEMP/xcodegen/xcodegen/install.sh" "$PREFIX"
+          echo "$PREFIX/bin" >> "$GITHUB_PATH"
+
+      - name: Generate project
+        run: xcodegen generate --spec project.yml
+
+      - name: Pick simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          UDID=$(python3 - <<'PY'
+import json, os
+d=json.load(open(os.environ['RUNNER_TEMP'] + '/devices.json'))
+for runtime, devices in d.get('devices', {}).items():
+    for dev in devices:
+        if dev.get('isAvailable') and 'iPhone' in dev.get('name',''):
+            print(dev['udid']); raise SystemExit(0)
+raise SystemExit(1)
+PY
+)
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          echo "Using simulator $UDID"
+
+      - name: Build for simulator
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project OpenCodeMobile.xcodeproj -scheme OpenCodeMobile -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath "$RUNNER_TEMP/SimDerived" \
+            ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+
+      - name: Install and launch
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/SimDerived/Build/Products/Debug-iphonesimulator/OpenCodeMobile.app"
+          test -d "$APP"
+          xcrun simctl boot "$UDID" || true
+          timeout 180 xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" app.opencodemob.ios || true
+          sleep 12
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/smoke.png" || true
+          xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "OpenCodeMobile"' --style compact > "$RUNNER_TEMP/smoke.log" || true
+          echo '--- log ---'
+          tail -120 "$RUNNER_TEMP/smoke.log"
+          echo '--- markers ---'
+          grep -E 'OCM (shell|python|git) self-test' "$RUNNER_TEMP/smoke.log" || true
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-smoke
+          path: |
+            ${{ runner.temp }}/smoke.png
+            ${{ runner.temp }}/smoke.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -42,6 +42,10 @@ final class AgentEngine {
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5) {
             let (code, output) = ShellRunner.shared.run("pwd; echo ---; ls -la", timeout: 15)
             NSLog("OCM shell self-test exit=\(code) output=\(output.prefix(2000))")
+            let (pyCode, pyOut) = ShellRunner.shared.run("python3 -c \"print(6*7)\"", timeout: 30)
+            NSLog("OCM python self-test exit=\(pyCode) output=\(pyOut.prefix(2000))")
+            let (gitCode, gitOut) = ShellRunner.shared.run("git --version", timeout: 15)
+            NSLog("OCM git self-test exit=\(gitCode) output=\(gitOut.prefix(2000))")
         }
     }
 
