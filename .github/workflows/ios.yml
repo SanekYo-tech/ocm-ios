@@ -105,6 +105,40 @@ jobs:
           shasum -a 256 "$IPA"
           echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
 
+      - name: Simulator smoke test
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          SIM_DERIVED="$RUNNER_TEMP/SimDerived"
+          rm -rf "$SIM_DERIVED"
+          xcodebuild build \
+            -project "$PROJECT" -scheme "$SCHEME" -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$SIM_DERIVED" \
+            ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+          APP="$SIM_DERIVED/Build/Products/Debug-iphonesimulator/OpenCodeMobile.app"
+          RUNTIME=$(xcrun simctl list runtimes | grep -E '^iOS ' | tail -n1 | sed -E 's/.*(com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9-]+).*/\1/')
+          DEVICE_TYPE=com.apple.CoreSimulator.SimDeviceType.iPhone-16
+          UDID=$(xcrun simctl create "OCM-Smoke" "$DEVICE_TYPE" "$RUNTIME")
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" app.opencodemob.ios || true
+          sleep 8
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/smoke.png" || true
+          mkdir -p "$RUNNER_TEMP/smoke"
+          cp "$RUNNER_TEMP/smoke.png" "$RUNNER_TEMP/smoke/" 2>/dev/null || true
+          xcrun simctl spawn "$UDID" log show --last 30s --predicate 'process == "OpenCodeMobile"' --style compact | tail -80 || true
+
+      - name: Upload smoke screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshot
+          path: ${{ runner.temp }}/smoke/smoke.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
