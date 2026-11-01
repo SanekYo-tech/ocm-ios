@@ -66,7 +66,7 @@ jobs:
           UDID=$(xcrun simctl create "OCM-Smoke" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID" || true
-          timeout 180 xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl launch "$UDID" app.opencodemob.ios || true
           sleep 12
