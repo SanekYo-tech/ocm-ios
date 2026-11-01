@@ -53,7 +53,7 @@ jobs:
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath "$RUNNER_TEMP/SimDerived" \
-            ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
 
       - name: Install and launch
         run: |
