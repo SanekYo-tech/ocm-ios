@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   smoke:
-    runs-on: macos-26
+    runs-on: macos-15-intel
     timeout-minutes: 45
 
     steps:
@@ -17,8 +17,7 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1 || true)"
-          if [ -z "$XCODE_APP" ]; then XCODE_APP="$(ls -d /Applications/Xcode*.app | sort -V | tail -n1)"; fi
+          if [ -d /Applications/Xcode_16.4.app ]; then XCODE_APP=/Applications/Xcode_16.4.app; else XCODE_APP="$(ls -d /Applications/Xcode*.app | sort -V | tail -n1)"; fi
           sudo xcode-select -s "$XCODE_APP/Contents/Developer"
           xcodebuild -version
 
@@ -53,7 +52,7 @@ jobs:
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath "$RUNNER_TEMP/SimDerived" \
-            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+            ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
 
       - name: Install and launch
         run: |
