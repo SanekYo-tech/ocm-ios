@@ -78,6 +78,12 @@ static BOOL ensurePython(void) {
     Py_SetProgramName(wprog);
     Py_Initialize();
     if (!Py_IsInitialized()) return NO;
+    NSString *lib = [home stringByAppendingPathComponent:@"lib/python3.9"];
+    NSString *site = [lib stringByAppendingPathComponent:@"site-packages"];
+    NSString *bootstrap = [NSString stringWithFormat:
+        @"import sys\nfor _p in [%@, %@]:\n    if _p not in sys.path:\n        sys.path.insert(0, _p)\n",
+        pyStringLiteral(lib), pyStringLiteral(site)];
+    PyRun_SimpleString(bootstrap.UTF8String);
     gPythonThreadState = PyEval_SaveThread();
     gPythonReady = YES;
     return YES;
@@ -200,11 +206,11 @@ NSString *OCMPythonRun(NSString *command, NSString *cwd) {
         }
     }
 
-    PyRun_SimpleString("import sys\nfor _s in (sys.stdout, sys.stderr):\n    try: _s.flush()\n    except Exception: pass\n");
     if (PyErr_Occurred()) {
         PyErr_Print();
         rc = -1;
     }
+    PyRun_SimpleString("import sys\nfor _s in (sys.stdout, sys.stderr):\n    try: _s.flush()\n    except Exception: pass\n");
     PyGILState_Release(gil);
 
     fflush(stdout);
