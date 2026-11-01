@@ -1,0 +1,23 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.3.3 effective-5.10 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)
+// swift-module-flags: -target arm64-apple-ios14.0-macabi -enable-objc-interop -enable-library-evolution -swift-version 5 -O -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -module-name shell
+// swift-module-flags-ignorable: -no-verify-emitted-module-interface -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3.3
+import Foundation
+import JavaScriptCore
+import Swift
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+import ios_system
+@_exported import shell
+extension Foundation.URL {
+  public var isDirectory: Swift.Bool {
+    get
+  }
+}
+@_cdecl("jsc")
+public func jsc(argc: Swift.Int32, argv: Swift.UnsafeMutablePointer<Swift.UnsafeMutablePointer<Swift.Int8>?>?) -> Swift.Int32
+@_cdecl("wasm")
+public func wasm(argc: Swift.Int32, argv: Swift.UnsafeMutablePointer<Swift.UnsafeMutablePointer<Swift.Int8>?>?) -> Swift.Int32
+@_cdecl("source")
+public func source(argc: Swift.Int32, argv: Swift.UnsafeMutablePointer<Swift.UnsafeMutablePointer<Swift.Int8>?>?) -> Swift.Int32

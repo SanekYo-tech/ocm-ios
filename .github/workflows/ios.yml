@@ -1,0 +1,132 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    env:
+      SCHEME: OpenCodeMobile
+      PROJECT: OpenCodeMobile.xcodeproj
+      APP_NAME: OpenCodeMobile
+      XCODEGEN_VERSION: "2.46.0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1 || true)"
+          if [ -z "$XCODE_APP" ]; then XCODE_APP="$(ls -d /Applications/Xcode*.app | sort -V | tail -n1)"; fi
+          echo "Using $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Install XcodeGen
+        run: |
+          set -euo pipefail
+          PREFIX="$RUNNER_TEMP/xcodegen-prefix"
+          rm -rf "$PREFIX" "$RUNNER_TEMP/xcodegen" "$RUNNER_TEMP/xcodegen.zip"
+          mkdir -p "$PREFIX"
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
+          bash "$RUNNER_TEMP/xcodegen/xcodegen/install.sh" "$PREFIX"
+          echo "$PREFIX/bin" >> "$GITHUB_PATH"
+          "$PREFIX/bin/xcodegen" --version
+
+      - name: Generate Xcode project
+        run: |
+          set -euo pipefail
+          xcodegen generate --spec project.yml
+          xcodebuild -list -project "$PROJECT"
+
+      - name: Archive unsigned
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/OpenCodeMobile.xcarchive"
+          DERIVED="$RUNNER_TEMP/DerivedData"
+          rm -rf "$ARCHIVE" "$DERIVED"
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -sdk iphoneos \
+            -archivePath "$ARCHIVE" \
+            -derivedDataPath "$DERIVED" \
+            MARKETING_VERSION="1.0.0" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS=arm64 \
+            SKIP_INSTALL=NO
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/OpenCodeMobile.xcarchive/Products/Applications/$APP_NAME.app"
+          IPA="$RUNNER_TEMP/OpenCode-iOS-1.0.0-${GITHUB_RUN_NUMBER}.ipa"
+          if [ ! -d "$APP" ]; then
+            echo "App not found at $APP" >&2
+            find "$RUNNER_TEMP/OpenCodeMobile.xcarchive" -maxdepth 4 -type d >&2
+            exit 1
+          fi
+          rm -rf "$RUNNER_TEMP/ipa"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          ditto "$APP" "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app"
+          cd "$RUNNER_TEMP/ipa"
+          ditto -c -k --norsrc --keepParent Payload "$IPA"
+          echo "IPA: $IPA"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist"
+          lipo -archs "$APP/$APP_NAME"
+          ls -lh "$IPA"
+          shasum -a 256 "$IPA"
+          echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenCode-iOS-unsigned
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-build-${{ github.run_number }}
+          name: OpenCode iOS 1.0.0 (build ${{ github.run_number }})
+          body: |
+            **OpenCode Mobile для iPhone — автономная сборка.**
+
+            Внутри: локальный workspace, файловый агент, реальный Unix-терминал (ios_system), OpenCode Zen (бесплатный режим / вход в аккаунт / свой ключ).
+
+            Установка: `.ipa` без подписи. Подпишите своим Apple ID через Sideloadly, AltStore или SideStore.
+            Бесплатный Apple ID: 7 дней, затем переподписать. TrollStore — только iOS 14–17.0.
+
+            Ограничения iOS: нет Node/npm/python/git/компиляторов; терминал работает через встроенный набор Unix-команд.
+          files: ${{ env.IPA_PATH }}
+          make_latest: true
+          fail_on_unmatched_files: true
