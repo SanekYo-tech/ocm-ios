@@ -66,11 +66,11 @@ jobs:
           UDID=$(xcrun simctl create "OCM-Smoke" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl install "$UDID" "$APP"
-          xcrun simctl launch "$UDID" app.opencodemob.ios || true
+          perl -e 'alarm shift; exec @ARGV' 120 xcrun simctl bootstatus "$UDID" -b || true
+          perl -e 'alarm shift; exec @ARGV' 120 xcrun simctl install "$UDID" "$APP" || true
+          perl -e 'alarm shift; exec @ARGV' 60 xcrun simctl launch "$UDID" app.opencodemob.ios || true
           sleep 12
-          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/smoke.png" || true
+          perl -e 'alarm shift; exec @ARGV' 60 xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/smoke.png" || true
           xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "OpenCodeMobile"' --style compact > "$RUNNER_TEMP/smoke.log" || true
           echo '--- log ---'
           tail -120 "$RUNNER_TEMP/smoke.log"
