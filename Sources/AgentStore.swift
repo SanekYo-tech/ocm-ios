@@ -125,6 +125,51 @@ func jsonText(_ value: Any) -> String {
     return s
 }
 
+/// OpenCode configs are JSONC. Strip comments and trailing commas before
+/// handing the text to JSONSerialization, while keeping the original file intact.
+func stripJSONC(_ text: String) -> String {
+    let chars = Array(text)
+    var out = ""
+    var i = 0
+    var inString = false
+    var escaped = false
+    while i < chars.count {
+        let c = chars[i]
+        if inString {
+            out.append(c)
+            if escaped { escaped = false }
+            else if c == "\\" { escaped = true }
+            else if c == "\"" { inString = false }
+            i += 1
+            continue
+        }
+        if c == "\"" {
+            inString = true
+            out.append(c)
+            i += 1
+            continue
+        }
+        if c == "/" && i + 1 < chars.count && chars[i + 1] == "/" {
+            i += 2
+            while i < chars.count && chars[i] != "\n" { i += 1 }
+            continue
+        }
+        if c == "/" && i + 1 < chars.count && chars[i + 1] == "*" {
+            i += 2
+            while i + 1 < chars.count && !(chars[i] == "*" && chars[i + 1] == "/") { i += 1 }
+            i = min(i + 2, chars.count)
+            continue
+        }
+        out.append(c)
+        i += 1
+    }
+    if let regex = try? NSRegularExpression(pattern: ",\\s*([}\\]])") {
+        let range = NSRange(out.startIndex..<out.endIndex, in: out)
+        out = regex.stringByReplacingMatches(in: out, range: range, withTemplate: "$1")
+    }
+    return out
+}
+
 func shortError(_ error: Error) -> String {
     let ns = error as NSError
     if ns.domain == NSURLErrorDomain {

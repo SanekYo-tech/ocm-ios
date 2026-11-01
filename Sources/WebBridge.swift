@@ -793,12 +793,12 @@ final class WebBridge: NSObject, WKUIDelegate {
     }
 
     private func localWriteConfig(_ text: String) -> String {
-        guard let data = text.data(using: .utf8),
+        guard let data = stripJSONC(text).data(using: .utf8),
               (try? JSONSerialization.jsonObject(with: data)) != nil else {
             return jsonString(["ok": false, "err": "Неверный JSON"])
         }
         do {
-            try data.write(to: AgentPaths.userConfigFile, options: .atomic)
+            try text.write(to: AgentPaths.userConfigFile, atomically: true, encoding: .utf8)
             AgentEngine.shared.reloadConfig()
             return jsonString(["ok": true])
         } catch {

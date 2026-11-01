@@ -408,10 +408,12 @@ final class AgentEngine {
         var cfg: [String: Any] = [:]
         let user = AgentPaths.userConfigFile
         let internalCfg = AgentPaths.configFile
-        if let data = try? Data(contentsOf: user),
+        if let text = try? String(contentsOf: user, encoding: .utf8),
+           let data = stripJSONC(text).data(using: .utf8),
            let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
             cfg = obj
-        } else if let data = try? Data(contentsOf: internalCfg),
+        } else if let text = try? String(contentsOf: internalCfg, encoding: .utf8),
+                  let data = stripJSONC(text).data(using: .utf8),
                   let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
             cfg = obj
         }
