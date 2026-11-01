@@ -26,7 +26,7 @@ final class ShellRunner {
         var output = ""
         queue.async {
             var c: Int32 = 0
-            let text = OCMRunCommand(command, cwd, &c) ?? ""
+            let text = OCMRunCommand(command, cwd ?? AgentPaths.workspace.path, &c) ?? ""
             code = c
             output = text
             sem.signal()
@@ -44,7 +44,7 @@ final class ShellRunner {
         ensureInit()
         queue.async {
             var c: Int32 = 0
-            let text = OCMRunCommand(command, cwd, &c) ?? ""
+            let text = OCMRunCommand(command, cwd ?? AgentPaths.workspace.path, &c) ?? ""
             DispatchQueue.main.async { completion(c, text) }
         }
     }

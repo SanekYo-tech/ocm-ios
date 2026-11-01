@@ -190,24 +190,6 @@ final class WebBridge: NSObject, WKUIDelegate {
         case "applyAppUpdate", "applyCoreUpdate":
             emit("update", ["error": "Обновления устанавливаются через GitHub Releases"])
             return nil
-        case "zenKeyGet":
-            return config.zenKey
-        case "zenKeySet":
-            config.zenKey = args.first as? String ?? ""
-            return nil
-        case "zenModelGet":
-            return config.zenModel
-        case "zenModelSet":
-            if let m = args.first as? String, !m.isEmpty { config.zenModel = m }
-            return nil
-        case "zenModelList":
-            return zenModelsJSON()
-        case "zenChat":
-            if let payload = args.first as? String { startZenChat(payload) }
-            return nil
-        case "zenStop":
-            stopZenChat()
-            return nil
         default:
             return nil
         }
