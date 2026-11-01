@@ -69,6 +69,12 @@ targets:
       - framework: Vendor/python39.xcframework
         embed: true
         link: true
+      - framework: Vendor/libssh2.xcframework
+        embed: true
+        link: false
+      - framework: Vendor/openssl.xcframework
+        embed: true
+        link: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "app.opencodemob.ios"

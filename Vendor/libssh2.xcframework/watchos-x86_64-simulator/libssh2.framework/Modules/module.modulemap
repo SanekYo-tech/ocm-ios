@@ -1,0 +1,5 @@
+module libssh2 {
+  umbrella "."
+
+  export *
+}

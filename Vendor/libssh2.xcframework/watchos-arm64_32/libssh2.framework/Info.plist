@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>libssh2</string>
+  <key>CFBundleIdentifier</key>
+  <string>org.libssh2</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>libssh2</string>
+  <key>CFBundlePackageType</key>
+  <string>FMWK</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.11.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>MinimumOSVersion</key>
+  <string>watchos_version_min</string>
+  <key>CFBundleSupportedPlatforms</key>
+  <array>
+    <string>WatchOS</string>
+  </array>
+  <key>UIDeviceFamily</key>
+  <array>
+       <integer>4</integer>
+  </array>
+  <key>DTPlatformName</key>
+  <string>watchos</string>
+  <key>DTPlatformVersion</key>
+  <string>9.1</string>
+  <key>DTSDKName</key>
+  <string>watchos9.1</string>
+</dict>
+</plist>
