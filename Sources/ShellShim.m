@@ -17,7 +17,6 @@ void OCMShellInit(NSString *root) {
         ios_setMiniRootURL(rootURL);
         ios_setMiniRoot(root);
         ios_setDirectoryURL(rootURL);
-        ios_useNativeTTY(false);
 
         ios_setenv("HOME", root.UTF8String, 1);
         ios_setenv("PWD", root.UTF8String, 1);
