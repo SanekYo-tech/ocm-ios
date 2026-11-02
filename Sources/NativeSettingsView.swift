@@ -184,6 +184,7 @@ final class NativeAccountModel: ObservableObject {
         ServerConfig.shared.zenRefresh = ""
         ServerConfig.shared.zenEmail = ""
         ServerConfig.shared.zenOrgID = ""
+        ServerConfig.shared.zenBase = ""
         ServerConfig.shared.zenKey = key
         refresh()
         error = nil

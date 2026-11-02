@@ -49,7 +49,8 @@ struct ZenError: Error {
 final class ZenClient {
     static let shared = ZenClient()
 
-    private let base = "https://opencode.ai/inference/openai/v1"
+    private let payBase = "https://opencode.ai/inference/openai/v1"
+    private let goBase = "https://opencode.ai/inference/go/openai/v1"
     private let userAgent = "opencode/release/2.2.5/opencode"
     private let console = "https://opencode.ai/console"
     private let config = ServerConfig.shared
@@ -95,7 +96,16 @@ final class ZenClient {
         ZenModel(id: "glm-5.3-flash-free", name: "GLM-5.3 Flash Free", context: 262_144, maxOutput: 65_536, free: true, tools: true, reasoning: true),
         ZenModel(id: "mimo-v2.6-flash-free", name: "MiMo V2.6 Flash Free", context: 262_144, maxOutput: 65_536, free: true, tools: true, reasoning: true),
         ZenModel(id: "nemotron-3.5-lightning-free", name: "Nemotron 3.5 Lightning Free", context: 262_144, maxOutput: 65_536, free: true, tools: true, reasoning: true),
-        ZenModel(id: "nemotron-3.5-super-vl-free", name: "Nemotron 3.5 Super VL Free", context: 262_144, maxOutput: 65_536, free: true, tools: true, reasoning: true)
+        ZenModel(id: "nemotron-3.5-super-vl-free", name: "Nemotron 3.5 Super VL Free", context: 262_144, maxOutput: 65_536, free: true, tools: true, reasoning: true),
+        // Paid fallbacks are available as soon as an API key or Console login exists.
+        ZenModel(id: "gpt-5.6-luna", name: "GPT-5.6 Luna", context: 1_000_000, maxOutput: 128_000, free: false, tools: true, reasoning: true),
+        ZenModel(id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash", context: 1_000_000, maxOutput: 384_000, free: false, tools: true, reasoning: true),
+        ZenModel(id: "claude-haiku-5-5", name: "Claude Haiku 5.5", context: 200_000, maxOutput: 64_000, free: false, tools: true, reasoning: true),
+        ZenModel(id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", context: 200_000, maxOutput: 64_000, free: false, tools: true, reasoning: true),
+        ZenModel(id: "gpt-5.6-sol", name: "GPT-5.6 Sol", context: 1_000_000, maxOutput: 128_000, free: false, tools: true, reasoning: true),
+        ZenModel(id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", context: 1_048_576, maxOutput: 65_536, free: false, tools: true, reasoning: true),
+        ZenModel(id: "glm-5.3", name: "GLM-5.3", context: 1_000_000, maxOutput: 131_072, free: false, tools: true, reasoning: true),
+        ZenModel(id: "kimi-k2.7-code", name: "Kimi K2.7 Code", context: 262_144, maxOutput: 262_144, free: false, tools: true, reasoning: true)
     ]
 
     private init() {}
@@ -123,16 +133,47 @@ final class ZenClient {
         models.first { $0.id == id }
     }
 
-    /// Models the user can actually call right now. Anonymous mode keeps only the free ones.
+    /// Models the app can actually call right now.
+    /// Free models are restricted by Console to the official OpenCode client, so an
+    /// authenticated third-party harness must use paid models only.
     var selectableModels: [ZenModel] {
-        models.filter { !anonymous || $0.free }
+        if anonymous { return models.filter { $0.free } }
+        return models.filter { !$0.free }
     }
 
     func defaultModel() -> String {
-        if let m = model(config.zenModel), (!anonymous || m.free) { return m.id }
         let list = selectableModels
+        if let m = model(config.zenModel), list.contains(where: { $0.id == m.id }) {
+            return m.id
+        }
+        if !anonymous {
+            for id in ["gpt-5.6-luna", "deepseek-v4.1-flash", "claude-haiku-5-5", "claude-sonnet-4-5", "gpt-5.6-sol"] {
+                if let m = list.first(where: { $0.id == id }) { return m.id }
+            }
+            if let paid = list.first { return paid.id }
+        }
         if let p = list.first(where: { $0.id == "big-pickle" }) { return p.id }
-        return list.first?.id ?? "big-pickle"
+        return list.first?.id ?? ""
+    }
+
+    private var baseCandidates: [String] {
+        guard hasKey else { return [payBase] }
+        var list = [payBase, goBase]
+        let saved = config.zenBase
+        if !saved.isEmpty, list.contains(saved) {
+            list.removeAll { $0 == saved }
+            list.insert(saved, at: 0)
+        }
+        return list
+    }
+
+    private func applyAuth(_ req: inout URLRequest, token: String) {
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // x-org-id belongs to the OAuth Console credential; a personal API key
+        // already selects its workspace and must not inherit another org scope.
+        if !hasKey, !config.zenOrgID.isEmpty {
+            req.setValue(config.zenOrgID, forHTTPHeaderField: "x-org-id")
+        }
     }
 
     // MARK: - catalog
@@ -196,6 +237,9 @@ final class ZenClient {
     }
 
     func currentToken() async -> String {
+        // A pasted API key is an explicit choice and always wins over a stale
+        // or free Console OAuth session.
+        if hasKey { return config.zenKey }
         if isLoggedIn {
             let expiry = config.zenExpiry
             if expiry == 0 || expiry > Date().timeIntervalSince1970 + 60 {
@@ -203,7 +247,6 @@ final class ZenClient {
             }
             if let refreshed = await refreshToken() { return refreshed }
         }
-        if hasKey { return config.zenKey }
         return "public"
     }
 
@@ -278,6 +321,7 @@ final class ZenClient {
                     let pobj = (try? JSONSerialization.jsonObject(with: pdata)) as? [String: Any] ?? [:]
                     if let access = pobj["access_token"] as? String {
                         self.config.zenAccess = access
+                        self.config.zenBase = ""
                         if let refresh = pobj["refresh_token"] as? String { self.config.zenRefresh = refresh }
                         if let org = pobj["org_id"] as? String { self.config.zenOrgID = org }
                         if let exp = pobj["expires_in"] as? Double {
@@ -327,6 +371,7 @@ final class ZenClient {
         config.zenExpiry = 0
         config.zenEmail = ""
         config.zenOrgID = ""
+        config.zenBase = ""
         config.zenKey = ""
     }
 
@@ -347,42 +392,53 @@ final class ZenClient {
         DispatchQueue.main.async { [weak self] in self?.onAuthEvent?(payload) }
     }
 
-    /// A user-triggered minimal request that reports exactly what OpenCode Zen says.
+    /// A user-triggered minimal request that tries both Console gateways.
     func probeFreeAccess() async -> String {
         let token = await currentToken()
-        let model = config.zenModel.isEmpty ? "big-pickle" : config.zenModel
-        guard let url = URL(string: base + "/chat/completions") else { return "Некорректный URL" }
-        let body: [String: Any] = [
-            "model": model,
-            "messages": [["role": "user", "content": "ping"]],
-            "max_tokens": 1,
-            "stream": false
-        ]
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.timeoutInterval = 30
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        let sid = "probe"
-        req.setValue(sid, forHTTPHeaderField: "x-opencode-session-id")
-        req.setValue(sid, forHTTPHeaderField: "x-opencode-session")
-        req.setValue(sid, forHTTPHeaderField: "x-session-affinity")
-        req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
-        req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
-        req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
-        if !config.zenOrgID.isEmpty { req.setValue(config.zenOrgID, forHTTPHeaderField: "x-org-id") }
-        req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
-        do {
-            let (data, response) = try await URLSession.shared.data(for: req)
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            record(status: status, model: model, note: "probe")
-            let text = String(decoding: data, as: UTF8.self)
-            return "HTTP \(status)\n\(String(text.prefix(1500)))"
-        } catch {
-            record(status: 0, model: model, note: "probe error")
-            return shortError(error)
+        let model = defaultModel().isEmpty ? "big-pickle" : defaultModel()
+        var reports: [String] = []
+        for base in baseCandidates {
+            guard let url = URL(string: base + "/chat/completions") else {
+                reports.append("Некорректный URL")
+                continue
+            }
+            let body: [String: Any] = [
+                "model": model,
+                "messages": [["role": "user", "content": "ping"]],
+                "max_tokens": 1,
+                "stream": false
+            ]
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.timeoutInterval = 30
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            applyAuth(&req, token: token)
+            req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            let sid = "probe"
+            req.setValue(sid, forHTTPHeaderField: "x-opencode-session-id")
+            req.setValue(sid, forHTTPHeaderField: "x-opencode-session")
+            req.setValue(sid, forHTTPHeaderField: "x-session-affinity")
+            req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
+            req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
+            req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
+            req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
+            let label = base.contains("/go/") ? "OpenCode Go" : "Pay-as-you-go"
+            do {
+                let (data, response) = try await URLSession.shared.data(for: req)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                record(status: status, model: model, note: "probe")
+                let text = String(decoding: data, as: UTF8.self)
+                reports.append("\(label): HTTP \(status)\n\(String(text.prefix(900)))")
+                if (200..<300).contains(status) {
+                    config.zenBase = base
+                    return reports.joined(separator: "\n\n")
+                }
+            } catch {
+                record(status: 0, model: model, note: "probe error")
+                reports.append("\(label): \(shortError(error))")
+            }
         }
+        return reports.joined(separator: "\n\n")
     }
 
     // MARK: - streaming chat
@@ -393,6 +449,41 @@ final class ZenClient {
                 tools: [[String: Any]],
                 onDelta: @escaping (_ field: String, _ delta: String) -> Void) async throws -> ZenResult {
         let token = await currentToken()
+        let effectiveModel = (!anonymous && (self.model(model)?.free ?? false)) ? defaultModel() : model
+        let candidates = baseCandidates
+        var primary: ZenError?
+        for (index, base) in candidates.enumerated() {
+            do {
+                let result = try await streamOnce(base: base, token: token, model: effectiveModel,
+                                                  sessionID: sessionID, messages: messages,
+                                                  tools: tools, onDelta: onDelta)
+                if config.zenBase != base { config.zenBase = base }
+                return result
+            } catch let error as ZenError {
+                if index == 0 { primary = error }
+                // A Go key at the pay-as-you-go URL and vice versa gives a
+                // misleading quota/auth response. Try the other gateway once.
+                if index + 1 < candidates.count, [401, 402, 403, 429].contains(error.status) {
+                    continue
+                }
+                throw primary ?? error
+            } catch {
+                if let primary { throw primary }
+                throw error
+            }
+        }
+        throw primary ?? ZenError(status: 0, message: "Нет доступного шлюза OpenCode")
+    }
+
+    // MARK: - streaming chat
+
+    private func streamOnce(base: String,
+                            token: String,
+                            model: String,
+                            sessionID: String? = nil,
+                            messages: [[String: Any]],
+                            tools: [[String: Any]],
+                            onDelta: @escaping (_ field: String, _ delta: String) -> Void) async throws -> ZenResult {
         guard let url = URL(string: base + "/chat/completions") else {
             throw ZenError(status: 0, message: "Некорректный адрес API")
         }
@@ -411,7 +502,7 @@ final class ZenClient {
         req.timeoutInterval = 900
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        applyAuth(&req, token: token)
         req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         let sid = sessionID ?? "ios-local"
         req.setValue(sid, forHTTPHeaderField: "x-opencode-session-id")
@@ -420,7 +511,6 @@ final class ZenClient {
         req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
         req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
         req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
-        if !config.zenOrgID.isEmpty { req.setValue(config.zenOrgID, forHTTPHeaderField: "x-org-id") }
         req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
 
         let (bytes, response) = try await session.bytes(for: req)

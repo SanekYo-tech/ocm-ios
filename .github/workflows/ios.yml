@@ -133,6 +133,8 @@ jobs:
 
             Внутри: нативный SwiftUI-интерфейс с Liquid Glass (iOS 26), локальный workspace, файловый агент, терминал ios_system, **git (libgit2)**, **Python 3.13**, OpenCode Zen и редактируемый `config.json`.
 
+            Zen: API-ключ имеет приоритет над OAuth; с ключом выбираются платные модели (бесплатные Console разрешает только официальному OpenCode), ключи Go автоматически идут через `/inference/go`.
+
             Установка: `.ipa` без подписи. Подпишите своим Apple ID через Sideloadly, AltStore или SideStore.
             Бесплатный Apple ID: 7 дней, затем переподписать. TrollStore — только iOS 14–17.0.
 

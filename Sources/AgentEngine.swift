@@ -772,8 +772,10 @@ final class AgentEngine {
                 if let ze = error as? ZenError {
                     if ze.status == 401 {
                         message = "Нужен вход в аккаунт OpenCode или API-ключ. Откройте Настройки → Аккаунт opencode."
+                    } else if ze.status == 403 && ze.message.lowercased().contains("free") {
+                        message = "Это бесплатная модель. Console разрешает их только официальному OpenCode. Выберите платную модель или ключ Go."
                     } else if ze.isQuota {
-                        message = "Квота модели исчерпана. Войдите в аккаунт OpenCode (Настройки → Аккаунт opencode), выберите другую бесплатную модель или добавьте API-ключ."
+                        message = "Лимит этой модели/аккаунта. С API-ключом выбирайте платную модель: бесплатные работают только в официальном OpenCode. Для ключа Go приложение само пробует /inference/go; при нулевом балансе пополните Console."
                     } else {
                         message = ze.message
                     }

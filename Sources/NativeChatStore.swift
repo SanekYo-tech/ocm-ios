@@ -53,7 +53,8 @@ final class NativeChatStore: ObservableObject {
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "ocm.native.model") ?? ""
-        selectedModel = saved.isEmpty ? zen.defaultModel() : saved
+        let initial = zen.selectableModels
+        selectedModel = (!saved.isEmpty && initial.contains(where: { $0.id == saved })) ? saved : zen.defaultModel()
         selectedAgent = UserDefaults.standard.string(forKey: "ocm.native.agent") ?? "build"
         engine.eventHandler = { [weak self] payload in
             Task { [weak self] in await MainActor.run { self?.handle(payload) } }
@@ -161,6 +162,13 @@ final class NativeChatStore: ObservableObject {
     func send(_ raw: String) {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !busy else { return }
+        // A model saved before the user connected an API key may be a free
+        // model, which Console rejects outside the official client.
+        if !zen.anonymous, let current = zen.model(selectedModel), current.free {
+            selectedModel = zen.defaultModel()
+            models = zen.selectableModels
+            UserDefaults.standard.set(selectedModel, forKey: "ocm.native.model")
+        }
         if currentSessionID == nil {
             newSession()
         }

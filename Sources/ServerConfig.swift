@@ -61,8 +61,14 @@ final class ServerConfig {
     }
 
     var zenModel: String {
-        get { defaults.string(forKey: "ocm.zen.model") ?? "big-pickle" }
+        get { defaults.string(forKey: "ocm.zen.model") ?? "" }
         set { defaults.set(newValue, forKey: "ocm.zen.model") }
+    }
+
+    /// Last Console gateway that accepted the current credential. Empty means auto.
+    var zenBase: String {
+        get { defaults.string(forKey: "ocm.zen.base") ?? "" }
+        set { defaults.set(newValue, forKey: "ocm.zen.base") }
     }
 
     var hasServer: Bool { !serverURL.isEmpty }

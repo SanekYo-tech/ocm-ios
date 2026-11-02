@@ -375,6 +375,11 @@ struct ModelPickerView: View {
                             ForEach(paid, id: \.id) { model in row(model) }
                         }
                     }
+                    Section {
+                        Text("Бесплатные модели Console работают только в официальном OpenCode. В этом приложении выбирай платную модель или модель Go.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OCTheme.muted)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
