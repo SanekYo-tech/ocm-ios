@@ -55,6 +55,11 @@ final class ServerConfig {
         set { defaults.set(newValue, forKey: "ocm.zen.email") }
     }
 
+    var zenOrgID: String {
+        get { defaults.string(forKey: "ocm.zen.org") ?? "" }
+        set { defaults.set(newValue, forKey: "ocm.zen.org") }
+    }
+
     var zenModel: String {
         get { defaults.string(forKey: "ocm.zen.model") ?? "big-pickle" }
         set { defaults.set(newValue, forKey: "ocm.zen.model") }

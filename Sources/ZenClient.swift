@@ -225,6 +225,7 @@ final class ZenClient {
                   let access = obj["access_token"] as? String else { return nil }
             config.zenAccess = access
             if let refresh = obj["refresh_token"] as? String { config.zenRefresh = refresh }
+            if let org = obj["org_id"] as? String { config.zenOrgID = org }
             if let expires = obj["expires_in"] as? Double {
                 config.zenExpiry = Date().timeIntervalSince1970 + expires
             }
@@ -278,6 +279,7 @@ final class ZenClient {
                     if let access = pobj["access_token"] as? String {
                         self.config.zenAccess = access
                         if let refresh = pobj["refresh_token"] as? String { self.config.zenRefresh = refresh }
+                        if let org = pobj["org_id"] as? String { self.config.zenOrgID = org }
                         if let exp = pobj["expires_in"] as? Double {
                             self.config.zenExpiry = Date().timeIntervalSince1970 + exp
                         } else if let exp = pobj["expires_in"] as? Int {
@@ -324,6 +326,7 @@ final class ZenClient {
         config.zenRefresh = ""
         config.zenExpiry = 0
         config.zenEmail = ""
+        config.zenOrgID = ""
         config.zenKey = ""
     }
 
@@ -368,6 +371,7 @@ final class ZenClient {
         req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
         req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
         req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
+        if !config.zenOrgID.isEmpty { req.setValue(config.zenOrgID, forHTTPHeaderField: "x-org-id") }
         req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
@@ -416,6 +420,7 @@ final class ZenClient {
         req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
         req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
         req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
+        if !config.zenOrgID.isEmpty { req.setValue(config.zenOrgID, forHTTPHeaderField: "x-org-id") }
         req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
 
         let (bytes, response) = try await session.bytes(for: req)

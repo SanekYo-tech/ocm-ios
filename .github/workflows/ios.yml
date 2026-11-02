@@ -95,6 +95,11 @@ jobs:
           rm -rf "$RUNNER_TEMP/ipa"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$APP" "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app"
+          # Sideloaders and TrollStore expect nested code to have at least an
+          # ad-hoc signature before they re-sign the app.
+          find "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app/Frameworks" -maxdepth 1 -name '*.framework' -print0 | while IFS= read -r -d '' fw; do
+            codesign --force --deep --sign - --timestamp=none "$fw" >/dev/null 2>&1 || true
+          done
           cd "$RUNNER_TEMP/ipa"
           ditto -c -k --norsrc --keepParent Payload "$IPA"
           echo "IPA: $IPA"
