@@ -71,25 +71,6 @@ static NSString *pyLiteral(NSString *value) {
     return @"''";
 }
 
-static NSString *readStream(FILE *stream) {
-    if (!stream) return @"";
-    fflush(stream);
-    long size = ftell(stream);
-    if (size <= 0) return @"";
-    rewind(stream);
-    const long cap = 800 * 1024;
-    long toRead = MIN(size, cap);
-    char *buf = malloc((size_t)toRead + 1);
-    if (!buf) return @"";
-    size_t got = fread(buf, 1, (size_t)toRead, stream);
-    buf[got] = 0;
-    NSString *s = [[NSString alloc] initWithBytes:buf length:got encoding:NSUTF8StringEncoding];
-    if (!s) s = [[NSString alloc] initWithBytes:buf length:got encoding:NSISOLatin1StringEncoding];
-    free(buf);
-    if (size > cap) s = [s stringByAppendingString:@"\n…[вывод обрезан]"];
-    return s ?: @"";
-}
-
 static void *symbol(const char *name) {
     if (!gHandle) return NULL;
     return dlsym(gHandle, name);
@@ -253,21 +234,16 @@ static NSString *runPython(NSString *command, NSString *cwd) {
     wchar_t **argv = calloc((size_t)argc + 1, sizeof(wchar_t *));
     for (int i = 0; i < argc; i++) argv[i] = pDecode(argvStrings[i].UTF8String, NULL);
 
-    int savedOut = dup(STDOUT_FILENO);
-    int savedErr = dup(STDERR_FILENO);
-    FILE *out = tmpfile();
-    FILE *err = tmpfile();
-    if (out) dup2(fileno(out), STDOUT_FILENO);
-    if (err) dup2(fileno(err), STDERR_FILENO);
+    NSString *resultDir = NSTemporaryDirectory();
+    NSString *resultPath = [resultDir stringByAppendingPathComponent:[NSString stringWithFormat:@"ocm-py-%@.txt", NSUUID.UUID.UUIDString]];
+    NSString *rcPath = [resultPath stringByAppendingString:@".rc"];
+    [[NSFileManager defaultManager] removeItemAtPath:resultPath error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:rcPath error:nil];
 
-    NSLog(@"OCM PY run start %@", command);
-    pSysArgv(argc, argv, 1);
-    NSString *pathCode = [NSString stringWithFormat:@"import sys\n_p=%@\nif _p not in sys.path: sys.path.insert(0,_p)\n", pyLiteral(workDir)];
-    pRunString(pathCode.UTF8String);
-
-    int rc = 0;
+    NSString *source = nil;
+    NSString *filename = @"<string>";
     if (code) {
-        rc = pRunString(code.UTF8String);
+        source = code;
     } else if (module) {
         NSString *safe = module;
         NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._"];
@@ -276,51 +252,69 @@ static NSString *runPython(NSString *command, NSString *cwd) {
             unichar c = [safe characterAtIndex:i];
             if ([allowed characterIsMember:c]) [clean appendFormat:@"%C", c];
         }
-        NSString *run = [NSString stringWithFormat:@"import runpy; runpy.run_module('%@', run_name='__main__', alter_sys=True)", clean];
-        rc = pRunString(run.UTF8String);
+        source = [NSString stringWithFormat:@"import runpy\nrunpy.run_module(%@, run_name='__main__', alter_sys=True)", pyLiteral(clean)];
+        filename = @"<runpy>";
     } else if (resolvedScript) {
-        FILE *fp = fopen(resolvedScript.fileSystemRepresentation, "r");
-        if (!fp) rc = -1;
-        else rc = pRunFile(fp, resolvedScript.fileSystemRepresentation, 1, NULL);
+        NSError *readError = nil;
+        source = [NSString stringWithContentsOfFile:resolvedScript encoding:NSUTF8StringEncoding error:&readError];
+        if (!source) {
+            return [NSString stringWithFormat:@"python3: can't read file '%@': %@\n", script, readError.localizedDescription ?: @"decode error"];
+        }
+        filename = resolvedScript;
     }
 
+    if (!source) {
+        return @"python3: no code to execute\n";
+    }
+
+    NSString *wrapper = [NSString stringWithFormat:
+        @"import sys, io, traceback\n"
+        @"__ocm_buf = io.StringIO()\n"
+        @"__ocm_out, __ocm_err = sys.stdout, sys.stderr\n"
+        @"sys.stdout = __ocm_buf\n"
+        @"sys.stderr = __ocm_buf\n"
+        @"__ocm_rc = 0\n"
+        @"try:\n"
+        @"    __ocm_globals = {'__name__': '__main__', '__file__': %@}\n"
+        @"    exec(compile(%@, %@, 'exec'), __ocm_globals)\n"
+        @"except SystemExit as __ocm_exit:\n"
+        @"    __ocm_rc = int(__ocm_exit.code) if isinstance(__ocm_exit.code, int) else (0 if __ocm_exit.code is None else 1)\n"
+        @"except BaseException:\n"
+        @"    traceback.print_exc()\n"
+        @"    __ocm_rc = 1\n"
+        @"finally:\n"
+        @"    sys.stdout = __ocm_out\n"
+        @"    sys.stderr = __ocm_err\n"
+        @"    open(%@, 'w', encoding='utf-8').write(__ocm_buf.getvalue())\n"
+        @"    open(%@, 'w', encoding='utf-8').write(str(__ocm_rc))\n",
+        pyLiteral(filename), pyLiteral(source), pyLiteral(filename), pyLiteral(resultPath), pyLiteral(rcPath)];
+
+    NSLog(@"OCM PY run start %@", command);
+    pSysArgv(argc, argv, 1);
+    NSString *pathCode = [NSString stringWithFormat:@"import sys\n_p=%@\nif _p not in sys.path: sys.path.insert(0,_p)\n", pyLiteral(workDir)];
+    pRunString(pathCode.UTF8String);
+    int rc = pRunString(wrapper.UTF8String);
     if (pErrOccurred && pErrOccurred()) {
         pErrPrint();
         rc = -1;
     }
+    NSString *resultText = [NSString stringWithContentsOfFile:resultPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    NSString *rcText = [NSString stringWithContentsOfFile:rcPath encoding:NSUTF8StringEncoding error:nil];
+    if (rcText) {
+        int pyRC = rcText.intValue;
+        if (pyRC != 0) rc = pyRC;
+    }
+    [[NSFileManager defaultManager] removeItemAtPath:resultPath error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:rcPath error:nil];
     NSLog(@"OCM PY rc=%d", rc);
-    pRunString("import sys\nfor _s in (sys.stdout, sys.stderr):\n    try: _s.flush()\n    except Exception: pass\n");
-    NSLog(@"OCM PY flushed");
-
-    fflush(stdout);
-    fflush(stderr);
-    if (out) {
-        fsync(fileno(out));
-        if (savedOut >= 0) dup2(savedOut, STDOUT_FILENO);
-    }
-    if (err) {
-        fsync(fileno(err));
-        if (savedErr >= 0) dup2(savedErr, STDERR_FILENO);
-    }
-    if (savedOut >= 0) close(savedOut);
-    if (savedErr >= 0) close(savedErr);
-
-    NSString *stdoutText = readStream(out);
-    NSString *stderrText = readStream(err);
-    if (out) fclose(out);
-    if (err) fclose(err);
 
     for (int i = 0; i < argc; i++) if (argv[i]) pRawFree(argv[i]);
     free(argv);
     if (changed) chdir(previous);
 
-    NSString *combined = stdoutText;
-    if (stderrText.length) {
-        if (combined.length && ![combined hasSuffix:@"\n"]) combined = [combined stringByAppendingString:@"\n"];
-        combined = [combined stringByAppendingString:stderrText];
-    }
     gExit = rc == 0 ? 0 : 1;
-    return combined;
+    return resultText;
+
 }
 
 NSString *OCMPythonRun(NSString *command, NSString *cwd) {
