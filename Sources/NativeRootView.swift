@@ -25,15 +25,7 @@ struct RootView: View {
             .tint(OCTheme.accent)
         }
         .preferredColorScheme(.dark)
-        .task {
-            chat.bootstrap()
-            if ProcessInfo.processInfo.environment["OCM_PY_TEST"] == "1" {
-                NSLog("OCM PY TEST requested")
-                DispatchQueue.global(qos: .utility).async {
-                    let result = ShellRunner.shared.run("python3 -c \"print(6*7)\"", cwd: AgentPaths.workspace.path, timeout: 30)
-                    NSLog("OCM PY TEST code=\(result.code) out=\(result.output)")
-                }
-            }
-        }
+        .task { chat.bootstrap() }
+
     }
 }
