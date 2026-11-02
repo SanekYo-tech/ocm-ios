@@ -21,16 +21,25 @@ struct GlassSurface: ViewModifier {
     var tint: Color? = nil
 
     func body(content: Content) -> some View {
+#if swift(>=6.2)
         if #available(iOS 26.0, *) {
             content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         } else {
-            content
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(OCTheme.line.opacity(0.8), lineWidth: 0.5)
-                )
+            fallback(content)
         }
+#else
+        fallback(content)
+#endif
+    }
+
+    @ViewBuilder
+    private func fallback(_ content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(OCTheme.line.opacity(0.8), lineWidth: 0.5)
+            )
     }
 }
 
