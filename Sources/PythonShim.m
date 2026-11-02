@@ -273,12 +273,15 @@ static NSString *runPython(NSString *command, NSString *cwd) {
         @"__file__ = %@\n",
         pyLiteral(resultPath), pyLiteral(filename)];
 
-    NSLog(@"OCM PY run start %@", command);
+    NSLog(@"OCM PY run start %@ source=%@", command, source);
     pSysArgv(argc, argv, 1);
-    pRunString(setup.UTF8String);
+    int setupRC = pRunString(setup.UTF8String);
+    NSLog(@"OCM PY setup rc=%d err=%p", setupRC, pErrOccurred ? pErrOccurred() : NULL);
+    if (setupRC != 0 && pErrPrint) pErrPrint();
     NSString *pathCode = [NSString stringWithFormat:@"import sys\n_p=%@\nif _p not in sys.path: sys.path.insert(0,_p)\n", pyLiteral(workDir)];
     pRunString(pathCode.UTF8String);
     int rc = pRunString(source.UTF8String);
+    NSLog(@"OCM PY source rc=%d err=%p", rc, pErrOccurred ? pErrOccurred() : NULL);
     if (pErrOccurred && pErrOccurred()) {
         pErrPrint();
         rc = -1;
