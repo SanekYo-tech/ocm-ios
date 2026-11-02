@@ -11,7 +11,6 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
-          xcrun simctl list runtimes
       - name: XcodeGen
         run: |
           PREFIX="$RUNNER_TEMP/xg"; mkdir -p "$PREFIX"
@@ -27,24 +26,30 @@ jobs:
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/SimDerived" \
             ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
-      - name: Launch and log
+      - name: Launch
         run: |
           APP="$RUNNER_TEMP/SimDerived/Build/Products/Debug-iphonesimulator/OpenCodeMobile.app"
           UDID=$(xcrun simctl create OCM-Smoke com.apple.CoreSimulator.SimDeviceType.iPhone-16 com.apple.CoreSimulator.SimRuntime.iOS-18-5)
           xcrun simctl boot "$UDID" || true
           perl -e 'alarm shift; exec @ARGV' 180 xcrun simctl bootstatus "$UDID" -b || true
-          perl -e 'alarm shift; exec @ARGV' 120 xcrun simctl install "$UDID" "$APP" || true
-          SIMCTL_CHILD_OCM_PY_TEST=1 perl -e 'alarm shift; exec @ARGV' 60 xcrun simctl launch "$UDID" app.opencodemob.ios || true
-          sleep 25
-          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/smoke.png" || true
-          xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "OpenCodeMobile"' --style compact > "$RUNNER_TEMP/smoke.log" || true
-          grep -E 'OCM PY TEST|crash|Crash|Exception|abort|Python' "$RUNNER_TEMP/smoke.log" | tail -80 || true
-          tail -40 "$RUNNER_TEMP/smoke.log" || true
+          xcrun simctl install "$UDID" "$APP"
+          echo '== launch normal =='
+          xcrun simctl launch "$UDID" app.opencodemob.ios; echo "launch code $?"
+          sleep 10
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/normal.png" || true
+          xcrun simctl terminate "$UDID" app.opencodemob.ios || true
+          echo '== launch python test =='
+          SIMCTL_CHILD_OCM_PY_TEST=1 xcrun simctl launch "$UDID" app.opencodemob.ios; echo "launch code $?"
+          sleep 20
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/python.png" || true
+          xcrun simctl spawn "$UDID" log show --last 3m --style compact > "$RUNNER_TEMP/smoke.log" || true
+          grep -aE 'OCM PY TEST|OpenCodeMobile|dyld|Python|abort|crash' "$RUNNER_TEMP/smoke.log" | tail -120 || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smoke
           path: |
-            ${{ runner.temp }}/smoke.png
+            ${{ runner.temp }}/normal.png
+            ${{ runner.temp }}/python.png
             ${{ runner.temp }}/smoke.log
           if-no-files-found: ignore
