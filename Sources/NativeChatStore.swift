@@ -138,7 +138,9 @@ final class NativeChatStore: ObservableObject {
 
     func deleteSession(_ id: String) {
         _ = engine.handle(method: "DELETE", path: "/session/\(id)", body: "")
-        sessions.removeAll { $0.id == id }
+        var copy = sessions
+        copy.removeAll { $0.id == id }
+        sessions = copy
         if currentSessionID == id {
             openSession(sessions.first?.id)
         }
@@ -148,7 +150,9 @@ final class NativeChatStore: ObservableObject {
         let body = jsonText(["title": title])
         _ = engine.handle(method: "PATCH", path: "/session/\(id)", body: body)
         if let i = sessions.firstIndex(where: { $0.id == id }) {
-            sessions[i].title = title
+            var copy = sessions
+            copy[i].title = title
+            sessions = copy
         }
     }
 
@@ -203,15 +207,12 @@ final class NativeChatStore: ObservableObject {
         case "session.created", "session.updated":
             if let info = props["info"] as? [String: Any] {
                 upsertSession(info)
-                if let id = info["id"] as? String, id == currentSessionID,
-                   let title = info["title"] as? String, !title.isEmpty,
-                   let i = sessions.firstIndex(where: { $0.id == id }) {
-                    sessions[i].title = title
-                }
             }
         case "session.deleted":
             if let info = props["info"] as? [String: Any], let id = info["id"] as? String {
-                sessions.removeAll { $0.id == id }
+                var copy = sessions
+                copy.removeAll { $0.id == id }
+                sessions = copy
                 if currentSessionID == id { openSession(sessions.first?.id) }
             }
         case "session.status":
@@ -255,12 +256,14 @@ final class NativeChatStore: ObservableObject {
                   let pid = props["partID"] as? String,
                   let delta = props["delta"] as? String else { return }
             if let mi = messages.firstIndex(where: { $0.id == mid }) {
-                if let pi = messages[mi].parts.firstIndex(where: { $0.id == pid }) {
-                    messages[mi].parts[pi].text += delta
+                var copy = messages
+                if let pi = copy[mi].parts.firstIndex(where: { $0.id == pid }) {
+                    copy[mi].parts[pi].text += delta
                 } else {
                     let kind: NativePart.Kind = (props["field"] as? String) == "reasoning" ? .reasoning : .text
-                    messages[mi].parts.append(NativePart(id: pid, kind: kind, text: delta))
+                    copy[mi].parts.append(NativePart(id: pid, kind: kind, text: delta))
                 }
+                messages = copy
                 bumpScroll()
             }
         case "todo.updated":
@@ -277,47 +280,53 @@ final class NativeChatStore: ObservableObject {
         let title = info["title"] as? String ?? "Новая сессия"
         let time = info["time"] as? [String: Any] ?? [:]
         let updated = (time["updated"] as? NSNumber)?.int64Value ?? 0
-        if let i = sessions.firstIndex(where: { $0.id == id }) {
-            sessions[i].title = title
-            sessions[i].updated = updated
+        var copy = sessions
+        if let i = copy.firstIndex(where: { $0.id == id }) {
+            copy[i].title = title
+            copy[i].updated = updated
         } else {
-            sessions.append(NativeSession(id: id, title: title, updated: updated))
+            copy.append(NativeSession(id: id, title: title, updated: updated))
         }
-        sessions.sort { $0.updated > $1.updated }
+        copy.sort { $0.updated > $1.updated }
+        sessions = copy
     }
 
     private func updateMessageInfo(id: String, info: [String: Any]) {
         let role = info["role"] as? String ?? "assistant"
         let parsed = message(from: info, parts: [])
-        if let i = messages.firstIndex(where: { $0.id == id }) {
-            messages[i].role = role
-            messages[i].error = parsed.error
-            messages[i].model = parsed.model
-            messages[i].tokens = parsed.tokens
-            messages[i].duration = parsed.duration
+        var copy = messages
+        if let i = copy.firstIndex(where: { $0.id == id }) {
+            copy[i].role = role
+            copy[i].error = parsed.error
+            copy[i].model = parsed.model
+            copy[i].tokens = parsed.tokens
+            copy[i].duration = parsed.duration
         } else {
             var msg = parsed
             msg.parts = []
-            messages.append(msg)
+            copy.append(msg)
         }
+        messages = copy
     }
 
     private func upsertPart(_ dict: [String: Any], messageID: String) {
         guard let id = dict["id"] as? String else { return }
         let part = parsePart(dict)
-        if let mi = messages.firstIndex(where: { $0.id == messageID }) {
-            if let pi = messages[mi].parts.firstIndex(where: { $0.id == id }) {
+        var copy = messages
+        if let mi = copy.firstIndex(where: { $0.id == messageID }) {
+            if let pi = copy[mi].parts.firstIndex(where: { $0.id == id }) {
                 var merged = part
-                if merged.text.isEmpty { merged.text = messages[mi].parts[pi].text }
-                messages[mi].parts[pi] = merged
+                if merged.text.isEmpty { merged.text = copy[mi].parts[pi].text }
+                copy[mi].parts[pi] = merged
             } else {
-                messages[mi].parts.append(part)
+                copy[mi].parts.append(part)
             }
         } else {
             var msg = NativeMessage(id: messageID, role: "assistant")
             msg.parts = [part]
-            messages.append(msg)
+            copy.append(msg)
         }
+        messages = copy
     }
 
     private func bumpScroll() {

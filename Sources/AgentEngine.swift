@@ -25,9 +25,6 @@ final class AgentEngine {
     private var defaultAgent = "build"
 
     private init() {
-        zen.onAuthEvent = { [weak self] event in
-            self?.bridge?.emitAuth(event)
-        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.store.statusesSnapshot().forEach { sid, _ in self.store.setStatus(sid, "idle") }
             Task { await self.zen.refreshCatalog() }
