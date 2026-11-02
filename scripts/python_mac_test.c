@@ -32,7 +32,7 @@ int main(void) {
     if (setProgram) setProgram(wp);
     initEx(0);
     if (!isInit()) { fprintf(stderr, "not initialized\n"); return 3; }
-    run("import sys\nprint('PY', sys.version)\nprint('PATH', sys.path[:5])\nprint('CALC', 6*7)\n");
+    run("import sys\nprint('PY', sys.version)\nprint('PATH', sys.path[:5])\nprint('CALC', 6*7)\nsys.stdout.flush()\nsys.stderr.flush()\n");
     fprintf(stderr, "version: %s\n", version ? version() : "?");
     return 0;
 }
