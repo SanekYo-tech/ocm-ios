@@ -53,8 +53,8 @@ final class NativeChatStore: ObservableObject {
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "ocm.native.model") ?? ""
-        let initial = zen.selectableModels
-        selectedModel = (!saved.isEmpty && initial.contains(where: { $0.id == saved })) ? saved : zen.defaultModel()
+        let initial = ZenClient.shared.selectableModels
+        selectedModel = (!saved.isEmpty && initial.contains(where: { $0.id == saved })) ? saved : ZenClient.shared.defaultModel()
         selectedAgent = UserDefaults.standard.string(forKey: "ocm.native.agent") ?? "build"
         engine.eventHandler = { [weak self] payload in
             Task { [weak self] in await MainActor.run { self?.handle(payload) } }
