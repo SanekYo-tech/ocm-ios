@@ -33,7 +33,11 @@ jobs:
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
-          SIMCTL_CHILD_OCM_PY_TEST=1 timeout 35s xcrun simctl launch --console "$UDID" app.opencodemob.ios > "$RUNNER_TEMP/console.txt" 2>&1 || true
+          SIMCTL_CHILD_OCM_PY_TEST=1 xcrun simctl launch --console "$UDID" app.opencodemob.ios > "$RUNNER_TEMP/console.txt" 2>&1 &
+          LPID=$!
+          sleep 30
+          kill "$LPID" 2>/dev/null || true
+          wait "$LPID" 2>/dev/null || true
           echo '== console =='
           cat "$RUNNER_TEMP/console.txt"
           xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/smoke.png" || true
