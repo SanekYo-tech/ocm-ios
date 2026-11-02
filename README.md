@@ -32,7 +32,7 @@
 - **Git** — встроенный libgit2: `init`, `status`, `add`, `reset`, `commit -m`, `log`, `diff`, `branch`, `checkout`, `rev-parse`, `remote`, `config`, `clone`.
 - **Python 3.9.10** — локальный интерпретатор со стандартной библиотекой: `python3 script.py`, `python3 -c "..."`. Без pip, ssl/sqlite3 и компиляторов.
 - **OpenCode Zen** — бесплатный режим `Bearer public`, вход в аккаунт OpenCode через device-flow (Google/GitHub в Safari) или свой API-ключ.
-- **Мобильный интерфейс OpenCode** — чат, дерево файлов, редактор, изменения, модели, темы. UI из Android-версии, адаптированный под WKWebView.
+- **Нативный интерфейс SwiftUI** — Liquid Glass на iOS 26, material-fallback на iOS 17–25: чат, сессии, модели, файлы, редактор, терминал и настройки. Без WebView.
 
 ## Чего здесь нет и почему
 
@@ -96,17 +96,19 @@ Sources/
   ZenClient.swift        OpenCode Zen: модели, device-flow, стриминг, tool calls
   ShellShim.m            мост к ios_system (stdout/stderr, песочница)
   ShellRunner.swift      последовательный запуск Unix-команд
-  WebBridge.swift        синхронный JS↔Swift мост (window.prompt)
-  StaticServer.swift     локальный HTTP-сервер для UI (WKWebView)
-  ContentView.swift      WKWebView + загрузка UI
-Resources/ui/            мобильный интерфейс OpenCode
+  NativeRootView.swift   TabView + Liquid Glass
+  NativeChatStore.swift  нативное состояние чата и SSE-события
+  NativeChatView.swift   чат, сессии, выбор модели
+  NativeFilesView.swift  файловый менеджер и редактор
+  NativeTerminalView.swift  нативный терминал ios_system
+  NativeSettingsView.swift  аккаунт, config.json, диагностика
+  NativeTheme.swift      Liquid Glass, markdown, tool cards
 Vendor/                  ios_system, files, shell, text, awk, tar (xcframework)
 ```
 
 ## Лицензии
 
 - Код приложения — MIT (`LICENSE`).
-- UI OpenCode Mobile — MIT, © opencode / OpenCode Mobile contributors.
 - [ios_system](https://github.com/holzschu/ios_system) и command frameworks — BSD-3-Clause, © Nicolas Holzschuch. См. `THIRD_PARTY.md`.
 - OpenCode — MIT, © Anomaly / opencode contributors. Проект не связан с командой OpenCode.
 
