@@ -9,6 +9,7 @@ static void OCMSetThreadStreams(FILE *input, FILE *output, FILE *error) {
 
 void OCMShellInit(NSString *root) {
     @autoreleasepool {
+        NSLog(@"OCM SHELL init start %@", root);
         initializeEnvironment();
         joinMainThread = true;
         sideLoading = true;
@@ -25,6 +26,7 @@ void OCMShellInit(NSString *root) {
         ios_setenv("PATH", path.UTF8String, 1);
         ios_setenv("LANG", "C.UTF-8", 1);
         ios_setenv("TERM", "xterm-256color", 1);
+        NSLog(@"OCM SHELL init done");
     }
 }
 

@@ -97,6 +97,7 @@ static void *symbol(const char *name) {
 
 static NSString *loadPython(void) {
     if (gHandle) return nil;
+    NSLog(@"OCM PY load start");
     NSString *path = [NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"python3_ios.framework/python3_ios"];
     if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
         path = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks/python3_ios.framework/python3_ios"];
@@ -106,8 +107,10 @@ static NSString *loadPython(void) {
     }
 
     gHandle = dlopen(path.fileSystemRepresentation, RTLD_NOW | RTLD_LOCAL);
+    NSLog(@"OCM PY dlopen %@ -> %p", path, gHandle);
     if (!gHandle) {
         const char *err = dlerror();
+        NSLog(@"OCM PY dlopen error %s", err ? err : "?");
         return [NSString stringWithFormat:@"python3: не удалось загрузить рантайм: %s", err ? err : "unknown"];
     }
 
@@ -124,6 +127,7 @@ static NSString *loadPython(void) {
     pRawFree = (PyRawFree)symbol("PyMem_RawFree");
     pVersion = (PyVersion)symbol("Py_GetVersion");
 
+    NSLog(@"OCM PY symbols home=%p init=%p run=%p", pSetHome, pInitEx, pRunString);
     if (!pSetHome || !pInitEx || !pIsInit || !pRunString || !pRunFile ||
         !pSysArgv || !pErrPrint || !pDecode || !pRawFree) {
         dlclose(gHandle);
@@ -161,7 +165,9 @@ static NSString *initializePython(void) {
     pSetHome(whome);
     if (pSetProgram) pSetProgram(wprog);
 
+    NSLog(@"OCM PY before InitializeEx");
     pInitEx(0);
+    NSLog(@"OCM PY after InitializeEx");
     if (!pIsInit()) {
         gLoadError = @"python3: Py_InitializeEx завершился неудачно";
         return gLoadError;
@@ -170,7 +176,9 @@ static NSString *initializePython(void) {
     NSString *bootstrap = [NSString stringWithFormat:
         @"import sys\nfor _p in [%@, %@]:\n    if _p not in sys.path:\n        sys.path.insert(0, _p)\n",
         pyLiteral(lib), pyLiteral([lib stringByAppendingPathComponent:@"site-packages"])];
+    NSLog(@"OCM PY bootstrap");
     pRunString(bootstrap.UTF8String);
+    NSLog(@"OCM PY ready");
     gReady = YES;
     return nil;
 }
@@ -252,6 +260,7 @@ static NSString *runPython(NSString *command, NSString *cwd) {
     if (out) dup2(fileno(out), STDOUT_FILENO);
     if (err) dup2(fileno(err), STDERR_FILENO);
 
+    NSLog(@"OCM PY run start %@", command);
     pSysArgv(argc, argv, 1);
     NSString *pathCode = [NSString stringWithFormat:@"import sys\n_p=%@\nif _p not in sys.path: sys.path.insert(0,_p)\n", pyLiteral(workDir)];
     pRunString(pathCode.UTF8String);
@@ -279,7 +288,9 @@ static NSString *runPython(NSString *command, NSString *cwd) {
         pErrPrint();
         rc = -1;
     }
+    NSLog(@"OCM PY rc=%d", rc);
     pRunString("import sys\nfor _s in (sys.stdout, sys.stderr):\n    try: _s.flush()\n    except Exception: pass\n");
+    NSLog(@"OCM PY flushed");
 
     fflush(stdout);
     fflush(stderr);
