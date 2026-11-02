@@ -550,11 +550,11 @@ struct AboutView: View {
                 .padding(.vertical, 12)
             }
             Section {
-                Text("Локальный workspace, AI-агент, Unix-терминал ios_system, git через libgit2 и Python 3.9. Всё работает на iPhone; компьютер нужен только для подписи IPA.")
+                Text("Локальный workspace, AI-агент, Unix-терминал ios_system, git через libgit2 и Python 3.13. Всё работает на iPhone; компьютер нужен только для подписи IPA.")
                     .font(.system(size: 13))
             }
             Section("Ограничения iOS") {
-                Text("Нет Node.js/npm и компиляторов. Python beta без pip/ssl/sqlite3. Git поддерживает init/status/add/commit/log/diff/branch/checkout; pull/push пока нет.")
+                Text("Нет Node.js/npm и компиляторов. Python beta без pip, ssl/sqlite3 включены. Git поддерживает init/status/add/commit/log/diff/branch/checkout; pull/push пока нет.")
                     .font(.system(size: 12))
                     .foregroundStyle(OCTheme.muted)
             }

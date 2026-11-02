@@ -98,9 +98,9 @@ static void *symbol(const char *name) {
 static NSString *loadPython(void) {
     if (gHandle) return nil;
     NSLog(@"OCM PY load start");
-    NSString *path = [NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"python3_ios.framework/python3_ios"];
+    NSString *path = [NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"Python.framework/Python"];
     if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        path = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks/python3_ios.framework/python3_ios"];
+        path = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks/Python.framework/Python"];
     }
     if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
         return @"python3: framework не найден в бандле";
@@ -143,7 +143,7 @@ static NSString *initializePython(void) {
     gTried = YES;
 
     NSString *home = [NSBundle.mainBundle.resourceURL.path stringByAppendingPathComponent:@"python"];
-    NSString *lib = [home stringByAppendingPathComponent:@"lib/python3.9"];
+    NSString *lib = [home stringByAppendingPathComponent:@"lib/python3.13"];
     if (![[NSFileManager defaultManager] fileExistsAtPath:[lib stringByAppendingPathComponent:@"os.py"]]) {
         gLoadError = @"python3: стандартная библиотека не встроена";
         return gLoadError;
@@ -192,7 +192,7 @@ BOOL OCMPythonIsCommand(NSString *command) {
     NSArray *args = pySplit(command);
     if (args.count == 0) return NO;
     NSString *first = args[0];
-    return [first isEqualToString:@"python"] || [first isEqualToString:@"python3"] || [first isEqualToString:@"python3.9"];
+    return [first isEqualToString:@"python"] || [first isEqualToString:@"python3"] || [first isEqualToString:@"python3.13"];
 }
 
 int OCMPythonLastExit(void) { return gExit; }
@@ -206,7 +206,7 @@ static NSString *runPython(NSString *command, NSString *cwd) {
     if (tokens.count == 0) return @"";
     NSMutableArray<NSString *> *args = [NSMutableArray arrayWithArray:[tokens subarrayWithRange:NSMakeRange(1, tokens.count - 1)]];
     if (args.count && ([args[0] isEqualToString:@"-V"] || [args[0] isEqualToString:@"--version"])) {
-        return [NSString stringWithFormat:@"Python %s\n", pVersion ? pVersion() : "3.9"];
+        return [NSString stringWithFormat:@"Python %s\n", pVersion ? pVersion() : "3.13"];
     }
 
     NSString *code = nil, *script = nil, *module = nil;

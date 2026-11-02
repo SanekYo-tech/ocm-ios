@@ -71,9 +71,9 @@ under terms of your choice. Source: https://github.com/libgit2/libgit2/blob/main
 
 ## CPython
 
-The app embeds the prebuilt `python3_ios.xcframework` and the Python 3.9.10
-standard library from [holzschu/python3_ios](https://github.com/holzschu/python3_ios)
-and [a-shell](https://github.com/holzschu/a-shell).
+The app embeds the prebuilt Python 3.13 iOS runtime and standard library
+from [Python-Apple-support](https://github.com/beeware/Python-Apple-support)
+(BeeWare), release `3.13-b18`.
 
 Python is licensed under the Python Software Foundation License Version 2.
 Source: https://docs.python.org/3/license.html

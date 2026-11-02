@@ -284,15 +284,15 @@
 	</array>
 	<key>python</key>
 	<array>
-		<string>Python_ios.framework/Python_ios</string>
-		<string>python_main</string>
+		<string>Python.framework/Python</string>
+		<string>Py_BytesMain</string>
 		<string>3bBc:dEhiJm:OQ:RsStuUvVW:xX?</string>
 		<string>file</string>
 	</array>
 	<key>python3</key>
 	<array>
-		<string>python3_ios.framework/python3_ios</string>
-		<string>python_main</string>
+		<string>Python.framework/Python</string>
+		<string>Py_BytesMain</string>
 		<string>3bBc:dEhiJm:OQ:RsStuUvVW:xX?</string>
 		<string>file</string>
 	</array>

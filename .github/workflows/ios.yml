@@ -100,6 +100,11 @@ jobs:
           find "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app/Frameworks" -maxdepth 1 -name '*.framework' -print0 | while IFS= read -r -d '' fw; do
             codesign --force --deep --sign - --timestamp=none "$fw" >/dev/null 2>&1 || true
           done
+          # CPython extension modules are Mach-O dylibs too; sign them so
+          # sideloaders that only re-sign bundles still produce loadable python.
+          find "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app/python" -name '*.so' -print0 2>/dev/null | while IFS= read -r -d '' so; do
+            codesign --force --sign - --timestamp=none "$so" >/dev/null 2>&1 || true
+          done
           cd "$RUNNER_TEMP/ipa"
           ditto -c -k --norsrc --keepParent Payload "$IPA"
           echo "IPA: $IPA"
@@ -126,14 +131,14 @@ jobs:
           body: |
             **OpenCode Mobile для iPhone — нативный интерфейс SwiftUI + Liquid Glass.**
 
-            Внутри: нативный SwiftUI-интерфейс с Liquid Glass (iOS 26), локальный workspace, файловый агент, терминал ios_system, **git (libgit2)**, **Python 3.9**, OpenCode Zen и редактируемый `config.json`.
+            Внутри: нативный SwiftUI-интерфейс с Liquid Glass (iOS 26), локальный workspace, файловый агент, терминал ios_system, **git (libgit2)**, **Python 3.13**, OpenCode Zen и редактируемый `config.json`.
 
             Установка: `.ipa` без подписи. Подпишите своим Apple ID через Sideloadly, AltStore или SideStore.
             Бесплатный Apple ID: 7 дней, затем переподписать. TrollStore — только iOS 14–17.0.
 
             Требования: iOS 17+, arm64. Liquid Glass — на iOS 26; на iOS 17–25 используется material-fallback.
 
-            Ограничения iOS: нет Node/npm и компиляторов; Python работает без pip/ssl/sqlite3; терминал использует встроенный набор Unix-команд.
+            Ограничения iOS: нет Node/npm и компиляторов; Python работает без pip, но с ssl/sqlite3; терминал использует встроенный набор Unix-команд.
           files: ${{ env.IPA_PATH }}
           make_latest: true
           fail_on_unmatched_files: true

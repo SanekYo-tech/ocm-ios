@@ -9,7 +9,7 @@
 - **AI-агент** — потоковые ответы, размышления, tool-cards, diff, todo, история сессий.
 - **Unix-терминал** — `ls`, `cat`, `grep`, `sed`, `awk`, `find`, `sort`, `uniq`, `wc`, `diff`, `cp`, `mv`, `rm`, `mkdir`, `tar`, `gzip` и другие команды через [ios_system](https://github.com/holzschu/ios_system).
 - **Git** — libgit2: `init`, `status`, `add`, `reset`, `commit -m`, `log`, `diff`, `branch`, `checkout`, `rev-parse`, `remote`, `config`, `clone`.
-- **Python 3.9 (beta)** — `python3 script.py`, `python3 -c "..."`. Рантайм загружается динамически: если он несовместим с устройством, приложение показывает ошибку вместо падения. Без pip/ssl/sqlite3.
+- **Python 3.13 (beta)** — `python3 script.py`, `python3 -c "..."`. Рантайм загружается динамически: если он несовместим с устройством, приложение показывает ошибку вместо падения. Есть стандартная библиотека, `ssl`, `sqlite3` и бинарные модули; без pip.
 - **OpenCode Zen** — анонимный режим `Bearer public`, вход в аккаунт OpenCode по device-flow (Google/GitHub в Safari) или свой API-ключ.
 - **`config.json`** — редактируется в «Файлах» или в Настройках: `model`, `agents`, `permissions`, `instructions`, `providers` и остальная структура OpenCode.
 
