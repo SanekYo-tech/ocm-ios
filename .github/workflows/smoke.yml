@@ -39,10 +39,14 @@ jobs:
           xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/normal.png" || true
           xcrun simctl terminate "$UDID" app.opencodemob.ios || true
           echo '== launch python test =='
-          SIMCTL_CHILD_OCM_PY_TEST=1 xcrun simctl launch "$UDID" app.opencodemob.ios; echo "launch code $?"
+          ( SIMCTL_CHILD_OCM_PY_TEST=1 perl -e 'alarm shift; exec @ARGV' 45 xcrun simctl launch --console-pty "$UDID" app.opencodemob.ios > "$RUNNER_TEMP/console.txt" 2>&1 || true ) &
           sleep 20
           xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/python.png" || true
           xcrun simctl spawn "$UDID" log show --last 3m --style compact > "$RUNNER_TEMP/smoke.log" || true
+          mkdir -p "$RUNNER_TEMP/crash" || true
+          find "$HOME/Library/Logs/DiagnosticReports" -name 'OpenCodeMobile*' -mmin -10 -exec cp {} "$RUNNER_TEMP/crash/" \; 2>/dev/null || true
+          echo '== console ==' 
+          cat "$RUNNER_TEMP/console.txt" || true
           grep -aE 'OCM PY TEST|OpenCodeMobile|dyld|Python|abort|crash' "$RUNNER_TEMP/smoke.log" | tail -120 || true
       - uses: actions/upload-artifact@v4
         if: always()
@@ -52,4 +56,6 @@ jobs:
             ${{ runner.temp }}/normal.png
             ${{ runner.temp }}/python.png
             ${{ runner.temp }}/smoke.log
+            ${{ runner.temp }}/console.txt
+            ${{ runner.temp }}/crash/*
           if-no-files-found: ignore
