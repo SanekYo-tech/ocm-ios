@@ -4,7 +4,7 @@ on:
 jobs:
   smoke:
     runs-on: macos-15-intel
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode
@@ -31,28 +31,17 @@ jobs:
           APP="$RUNNER_TEMP/SimDerived/Build/Products/Debug-iphonesimulator/OpenCodeMobile.app"
           UDID=$(xcrun simctl create OCM-Smoke com.apple.CoreSimulator.SimDeviceType.iPhone-16 com.apple.CoreSimulator.SimRuntime.iOS-18-5)
           xcrun simctl boot "$UDID" || true
-          perl -e 'alarm shift; exec @ARGV' 180 xcrun simctl bootstatus "$UDID" -b || true
+          xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
-          echo '== launch normal =='
-          xcrun simctl launch "$UDID" app.opencodemob.ios; echo "launch code $?"
-          sleep 10
-          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/normal.png" || true
-          xcrun simctl terminate "$UDID" app.opencodemob.ios || true
-          echo '== launch python test =='
-          SIMCTL_CHILD_OCM_PY_TEST=1 xcrun simctl launch "$UDID" app.opencodemob.ios || true
-          sleep 20
-          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/python.png" || true
-          xcrun simctl spawn "$UDID" log show --last 3m --style compact > "$RUNNER_TEMP/smoke.log" || true
-          mkdir -p "$RUNNER_TEMP/crash" || true
-          find "$HOME/Library/Logs/DiagnosticReports" -name 'OpenCodeMobile*' -mmin -10 -exec cp {} "$RUNNER_TEMP/crash/" \; 2>/dev/null || true
-          grep -aE 'OCM PY TEST|OpenCodeMobile|dyld|Python|abort|crash' "$RUNNER_TEMP/smoke.log" | tail -120 || true
+          SIMCTL_CHILD_OCM_PY_TEST=1 timeout 35s xcrun simctl launch --console "$UDID" app.opencodemob.ios > "$RUNNER_TEMP/console.txt" 2>&1 || true
+          echo '== console =='
+          cat "$RUNNER_TEMP/console.txt"
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/smoke.png" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smoke
           path: |
-            ${{ runner.temp }}/normal.png
-            ${{ runner.temp }}/python.png
-            ${{ runner.temp }}/smoke.log
-            ${{ runner.temp }}/crash/*
+            ${{ runner.temp }}/console.txt
+            ${{ runner.temp }}/smoke.png
           if-no-files-found: ignore
