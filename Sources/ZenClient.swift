@@ -361,6 +361,13 @@ final class ZenClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        let sid = "probe"
+        req.setValue(sid, forHTTPHeaderField: "x-opencode-session-id")
+        req.setValue(sid, forHTTPHeaderField: "x-opencode-session")
+        req.setValue(sid, forHTTPHeaderField: "x-session-affinity")
+        req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
+        req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
+        req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
         req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
@@ -377,6 +384,7 @@ final class ZenClient {
     // MARK: - streaming chat
 
     func stream(model: String,
+                sessionID: String? = nil,
                 messages: [[String: Any]],
                 tools: [[String: Any]],
                 onDelta: @escaping (_ field: String, _ delta: String) -> Void) async throws -> ZenResult {
@@ -401,6 +409,13 @@ final class ZenClient {
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        let sid = sessionID ?? "ios-local"
+        req.setValue(sid, forHTTPHeaderField: "x-opencode-session-id")
+        req.setValue(sid, forHTTPHeaderField: "x-opencode-session")
+        req.setValue(sid, forHTTPHeaderField: "x-session-affinity")
+        req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
+        req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
+        req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
         req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
 
         let (bytes, response) = try await session.bytes(for: req)

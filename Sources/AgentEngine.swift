@@ -664,7 +664,7 @@ final class AgentEngine {
             do {
                 let messages = buildProviderMessages(sessionID: sessionID, system: systemPrompt(agent: agent))
                 let tools = toolSchemas(readOnly: agent == "plan")
-                let result = try await zen.stream(model: modelID, messages: messages, tools: tools) { field, delta in
+                let result = try await zen.stream(model: modelID, sessionID: sessionID, messages: messages, tools: tools) { field, delta in
                     if field == "text" {
                         text += delta
                         if textPart == nil {
