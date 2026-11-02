@@ -145,7 +145,7 @@ final class NativeChatStore: ObservableObject {
     }
 
     func renameSession(_ id: String, title: String) {
-        let body = jsonString(["title": title])
+        let body = jsonText(["title": title])
         _ = engine.handle(method: "PATCH", path: "/session/\(id)", body: body)
         if let i = sessions.firstIndex(where: { $0.id == id }) {
             sessions[i].title = title
@@ -167,7 +167,7 @@ final class NativeChatStore: ObservableObject {
             "parts": [["type": "text", "text": text]]
         ]
         let (status, _) = engine.handle(method: "POST", path: "/session/\(sid)/prompt_async",
-                                        body: jsonString(body))
+                                        body: jsonText(body))
         if status >= 400 {
             errorMessage = "Не удалось отправить сообщение (HTTP \(status))"
             return
