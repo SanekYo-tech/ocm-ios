@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <limits.h>
+#include <errno.h>
+#include <string.h>
 
 // Python is loaded dynamically. If the prebuilt framework or one of its
 // dependencies is missing on a particular iOS build, dlopen fails and Python
@@ -26,6 +28,11 @@ typedef void *(*PyErrOccurred)(void);
 typedef wchar_t *(*PyDecodeLocale)(const char *, size_t *);
 typedef void (*PyRawFree)(void *);
 typedef const char *(*PyVersion)(void);
+typedef void *(*PyFileFromFd)(int, const char *, const char *, int, const char *, const char *, const char *, int);
+typedef int (*PySysSetObject)(const char *, void *);
+typedef void *(*PySysGetObject)(const char *);
+typedef void (*PyIncRef)(void *);
+typedef void (*PyDecRef)(void *);
 
 static PySetHome pSetHome;
 static PySetProgram pSetProgram;
@@ -39,6 +46,11 @@ static PyErrOccurred pErrOccurred;
 static PyDecodeLocale pDecode;
 static PyRawFree pRawFree;
 static PyVersion pVersion;
+static PyFileFromFd pFileFromFd;
+static PySysSetObject pSysSetObject;
+static PySysGetObject pSysGetObject;
+static PyIncRef pIncRef;
+static PyDecRef pDecRef;
 
 static NSArray<NSString *> *pySplit(NSString *input) {
     NSMutableArray<NSString *> *out = [NSMutableArray array];
@@ -107,10 +119,16 @@ static NSString *loadPython(void) {
     pDecode = (PyDecodeLocale)symbol("Py_DecodeLocale");
     pRawFree = (PyRawFree)symbol("PyMem_RawFree");
     pVersion = (PyVersion)symbol("Py_GetVersion");
+    pFileFromFd = (PyFileFromFd)symbol("PyFile_FromFd");
+    pSysSetObject = (PySysSetObject)symbol("PySys_SetObject");
+    pSysGetObject = (PySysGetObject)symbol("PySys_GetObject");
+    pIncRef = (PyIncRef)symbol("Py_IncRef");
+    pDecRef = (PyDecRef)symbol("Py_DecRef");
 
     NSLog(@"OCM PY symbols home=%p init=%p run=%p", pSetHome, pInitEx, pRunString);
     if (!pSetHome || !pInitEx || !pIsInit || !pRunString || !pRunFile ||
-        !pSysArgv || !pErrPrint || !pDecode || !pRawFree) {
+        !pSysArgv || !pErrPrint || !pDecode || !pRawFree ||
+        !pFileFromFd || !pSysSetObject || !pSysGetObject || !pIncRef || !pDecRef) {
         dlclose(gHandle);
         gHandle = NULL;
         return @"python3: в рантайме нет нужных C API";
@@ -186,7 +204,7 @@ static NSString *runPython(NSString *command, NSString *cwd) {
     NSArray<NSString *> *tokens = pySplit(command);
     if (tokens.count == 0) return @"";
     NSMutableArray<NSString *> *args = [NSMutableArray arrayWithArray:[tokens subarrayWithRange:NSMakeRange(1, tokens.count - 1)]];
-    if (args.count && ([args[0] isEqualToString:@"-V"] || [args[0] isEqualToString:@"--version"])) {
+    if (args.count && ([args[0] isEqualToString:@"-V"] || [args[0] isEqualToString:@"--version"] || [args[0] isEqualToString:@"-version"])) {
         return [NSString stringWithFormat:@"Python %s\n", pVersion ? pVersion() : "3.13"];
     }
 
@@ -234,9 +252,9 @@ static NSString *runPython(NSString *command, NSString *cwd) {
     wchar_t **argv = calloc((size_t)argc + 1, sizeof(wchar_t *));
     for (int i = 0; i < argc; i++) argv[i] = pDecode(argvStrings[i].UTF8String, NULL);
 
-    NSString *resultDir = NSTemporaryDirectory();
+    NSArray<NSString *> *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *resultDir = documents.firstObject ?: NSTemporaryDirectory();
     NSString *resultPath = [resultDir stringByAppendingPathComponent:[NSString stringWithFormat:@"ocm-py-%@.txt", NSUUID.UUID.UUIDString]];
-    [[NSFileManager defaultManager] removeItemAtPath:resultPath error:nil];
 
     NSString *source = nil;
     NSString *filename = @"<string>";
@@ -265,28 +283,42 @@ static NSString *runPython(NSString *command, NSString *cwd) {
         return @"python3: no code to execute\n";
     }
 
-    NSString *setup = [NSString stringWithFormat:
-        @"import sys\n"
-        @"__ocm_out = open(%@, 'w', encoding='utf-8')\n"
-        @"sys.stdout = __ocm_out\n"
-        @"sys.stderr = __ocm_out\n"
-        @"__file__ = %@\n",
-        pyLiteral(resultPath), pyLiteral(filename)];
+    FILE *capture = fopen(resultPath.fileSystemRepresentation, "w+");
+    if (!capture) {
+        return [NSString stringWithFormat:@"python3: cannot create output file: %s\n", strerror(errno)];
+    }
+    void *stream = pFileFromFd(fileno(capture), "ocm-python", "w", -1, "utf-8", "strict", NULL, 0);
+    if (!stream) {
+        fclose(capture);
+        return @"python3: cannot create Python stream\n";
+    }
+    void *oldOut = pSysGetObject("stdout");
+    void *oldErr = pSysGetObject("stderr");
+    if (oldOut) pIncRef(oldOut);
+    if (oldErr) pIncRef(oldErr);
+    pSysSetObject("stdout", stream);
+    pSysSetObject("stderr", stream);
 
     NSLog(@"OCM PY run start %@ source=%@", command, source);
     pSysArgv(argc, argv, 1);
-    int setupRC = pRunString(setup.UTF8String);
-    NSLog(@"OCM PY setup rc=%d err=%p", setupRC, pErrOccurred ? pErrOccurred() : NULL);
-    if (setupRC != 0 && pErrPrint) pErrPrint();
+    NSString *fileCode = [NSString stringWithFormat:@"import __main__\n__main__.__file__ = %@\n", pyLiteral(filename)];
+    pRunString(fileCode.UTF8String);
     NSString *pathCode = [NSString stringWithFormat:@"import sys\n_p=%@\nif _p not in sys.path: sys.path.insert(0,_p)\n", pyLiteral(workDir)];
     pRunString(pathCode.UTF8String);
     int rc = pRunString(source.UTF8String);
-    NSLog(@"OCM PY source rc=%d err=%p", rc, pErrOccurred ? pErrOccurred() : NULL);
     if (pErrOccurred && pErrOccurred()) {
         pErrPrint();
         rc = -1;
     }
-    pRunString("import sys\nfor _s in (sys.stdout, sys.stderr):\n    try: _s.flush()\n    except Exception: pass\nimport sys\ntry:\n    sys.stdout.close()\nexcept Exception: pass\n");
+    pRunString("import sys\nfor _s in (sys.stdout, sys.stderr):\n    try: _s.flush()\n    except Exception: pass\n");
+    fflush(capture);
+    pSysSetObject("stdout", oldOut);
+    pSysSetObject("stderr", oldErr);
+    if (oldOut) pDecRef(oldOut);
+    if (oldErr) pDecRef(oldErr);
+    pDecRef(stream);
+    fclose(capture);
+
     NSString *resultText = [NSString stringWithContentsOfFile:resultPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
     [[NSFileManager defaultManager] removeItemAtPath:resultPath error:nil];
     NSLog(@"OCM PY rc=%d", rc);

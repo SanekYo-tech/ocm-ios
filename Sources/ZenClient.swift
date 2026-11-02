@@ -50,7 +50,7 @@ final class ZenClient {
     static let shared = ZenClient()
 
     private let base = "https://opencode.ai/inference/openai/v1"
-    private let userAgent = "opencode/release/2.1.0/opencode"
+    private let userAgent = "opencode/release/2.2.5/opencode"
     private let console = "https://opencode.ai/console"
     private let config = ServerConfig.shared
     private let lock = NSRecursiveLock()
