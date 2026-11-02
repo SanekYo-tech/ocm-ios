@@ -4,8 +4,7 @@ import SwiftUI
 struct OpenCodeMobileApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .preferredColorScheme(.dark)
+            RootView()
                 .ignoresSafeArea()
         }
     }

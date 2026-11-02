@@ -8,6 +8,8 @@ final class AgentEngine {
     static let shared = AgentEngine()
 
     weak var bridge: WebBridge?
+    /// Native SwiftUI observers receive the same opencode events as the web bridge.
+    var eventHandler: (([String: Any]) -> Void)?
     private let store = AgentStore.shared
     private let zen = ZenClient.shared
     private let shell = ShellRunner.shared
@@ -36,17 +38,8 @@ final class AgentEngine {
         guard !initialized else { return }
         initialized = true
         AgentPaths.prepare()
-        _ = shell.hasCommand("ls")
         reloadConfig()
         _ = zen.defaultModel()
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5) {
-            let (code, output) = ShellRunner.shared.run("pwd; echo ---; ls -la", timeout: 15)
-            NSLog("OCM shell self-test exit=\(code) output=\(output.prefix(2000))")
-            let (pyCode, pyOut) = ShellRunner.shared.run("python3 -c \"print(6*7)\"", timeout: 30)
-            NSLog("OCM python self-test exit=\(pyCode) output=\(pyOut.prefix(2000))")
-            let (gitCode, gitOut) = ShellRunner.shared.run("git --version", timeout: 15)
-            NSLog("OCM git self-test exit=\(gitCode) output=\(gitOut.prefix(2000))")
-        }
     }
 
     func reloadConfig() {
@@ -164,11 +157,13 @@ final class AgentEngine {
     }
 
     private func emit(_ type: String, _ properties: [String: Any]) {
+        let payload: [String: Any] = ["type": type, "properties": properties]
         let event: [String: Any] = [
             "directory": AgentPaths.workspace.path,
-            "payload": ["type": type, "properties": properties]
+            "payload": payload
         ]
         bridge?.emitSSE(jsonText(event))
+        eventHandler?(payload)
     }
 
     private func emitMessage(_ sid: String, _ info: [String: Any]) {

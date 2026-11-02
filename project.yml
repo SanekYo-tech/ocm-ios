@@ -3,14 +3,14 @@ name: OpenCodeMobile
 options:
   bundleIdPrefix: app.opencodemob
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "17.0"
   createIntermediateGroups: true
   groupSortPosition: top
 
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     SUPPORTS_MACCATALYST: "NO"
     SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"
@@ -33,7 +33,7 @@ targets:
   OpenCodeMobile:
     type: application
     platform: iOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "17.0"
     sources:
       - path: Sources
       - path: Resources/ui
