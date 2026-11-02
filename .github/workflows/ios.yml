@@ -126,6 +126,8 @@ jobs:
             Установка: `.ipa` без подписи. Подпишите своим Apple ID через Sideloadly, AltStore или SideStore.
             Бесплатный Apple ID: 7 дней, затем переподписать. TrollStore — только iOS 14–17.0.
 
+Требования: iOS 17+, arm64. Liquid Glass — на iOS 26; на iOS 17–25 используется material-fallback.
+
             Ограничения iOS: нет Node/npm и компиляторов; Python работает без pip/ssl/sqlite3; терминал использует встроенный набор Unix-команд.
           files: ${{ env.IPA_PATH }}
           make_latest: true
