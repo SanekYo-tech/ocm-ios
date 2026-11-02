@@ -450,8 +450,8 @@ struct DiagnosticsView: View {
                 VStack(spacing: 8) {
                     diagButton("Проверить бесплатный доступ (1 запрос)", command: "__probe__")
                     diagButton("Shell: pwd + ls", command: "pwd; echo ---; ls -la")
-                    diagButton("Python: 6 × 7 (beta)", command: "python3 -c \"print(6*7)\")
-                    diagButton("Python: версия (beta)", command: "python3 -c \"import sys; print(sys.version)\")
+                    diagButton("Python: 6 × 7 (beta)", command: "python3 -c \"print(6*7)\"")
+                    diagButton("Python: версия (beta)", command: "python3 -c \"import sys; print(sys.version)\"")
                     diagButton("Git: --version", command: "git --version")
                 }
 
