@@ -66,12 +66,12 @@ final class NativeChatStore: ObservableObject {
         engine.start()
         models = zen.selectableModels
         loadSessions()
-        if let saved = UserDefaults.standard.string(forKey: "ocm.native.session"),
-           sessions.contains(where: { $0.id == saved }) {
-            openSession(saved)
-        } else if let first = sessions.first {
-            openSession(first.id)
-        }
+        // Always start with a fresh composer. Old sessions remain in the drawer;
+        // this avoids showing a saved quota error from a previous attempt as if
+        // it were a new model request.
+        currentSessionID = nil
+        messages = []
+        todos = []
         Task {
             await ZenClient.shared.refreshCatalog()
             await MainActor.run { [weak self] in

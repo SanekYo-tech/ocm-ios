@@ -651,7 +651,7 @@ final class WebBridge: NSObject, WKUIDelegate {
                 if cmd == "exit" { ws(id, "msg", "logout\r\n"); closeLocalTerminal(id: id); continue }
                 if cmd == "clear" { ws(id, "msg", "\u{001B}[2J\u{001B}[H" + promptText()); continue }
                 if cmd == "help" {
-                    ws(id, "msg", "Доступно: ls, cat, cd, pwd, echo, grep, sed, awk, find, sort, uniq, wc, diff, cp, mv, rm, mkdir, touch, chmod, tar, gzip, date, env, xargs, git (init/status/add/commit/log/diff/branch/checkout), python3 (script.py / -c).\r\nНет node, npm и компиляторов.\r\n" + promptText())
+                    ws(id, "msg", "Доступно: ls, cat, cd, pwd, echo, grep, sed, awk, find, sort, uniq, wc, diff, cp, mv, rm, mkdir, touch, chmod, tar, gzip, date, env, xargs, git (init/status/add/commit/log/diff/branch/checkout).\r\nНет node, npm и компиляторов. Python — beta.\r\n" + promptText())
                     continue
                 }
                 if cmd == "pwd" { ws(id, "msg", terminalCwd + "\r\n" + promptText()); continue }

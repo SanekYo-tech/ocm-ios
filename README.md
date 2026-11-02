@@ -1,78 +1,58 @@
 # OpenCode Mobile — iPhone
 
-<p align="center">
-  <img src="Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" width="112" alt="OpenCode">
-</p>
+Нативный OpenCode-агент для iPhone: SwiftUI, Liquid Glass на iOS 26, локальный workspace, терминал, Git и Python. Без компьютера и без proot.
 
-<p align="center"><b>OpenCode-агент, который живёт на iPhone. Без компьютера, без сервера, без proot.</b></p>
+## Возможности
 
----
-
-## Конфиг
-
-В корне рабочей папки лежит **`OpenCode/config.json`** — обычный OpenCode-конфиг со схемой `https://opencode.ai/config.json`. Его можно редактировать прямо в приложении «Файлы» или в Настройках → `config.json`.
-
-Поддерживаются:
-
-- `model` / `small_model` — модель по умолчанию (`opencode/big-pickle`);
-- `agents` — свои агенты, их `system`/`prompt`, `model`, `mode`;
-- `default_agent` — агент по умолчанию;
-- `permissions` / `permission` — запрет `bash`, `edit`, `read`, `webfetch` и т.п.;
-- `instructions` + `AGENTS.md` — правила проекта, попадают в системный промпт;
-- `providers.opencode.options.apiKey` — ключ OpenCode Console;
-- `mcp`, `plugins`, `compaction`, `watcher`, `snapshots` — структура сохраняется, приложение читает то, что умеет.
-
-## Что это
-
-Автономный порт идеи [OpenCode Mobile](https://github.com/lovereplit-bit/OCM) на iOS. Внутри приложения:
-
-- **Рабочая папка `OpenCode`** — видна в приложении «Файлы» → «На iPhone» → «OpenCode». Кладите туда проекты, агент читает и меняет их.
-- **AI-агент** — чат с историей, сессиями, инструментами чтения/записи/поиска файлов и списком задач.
-- **Настоящий Unix-терминал** — `ls`, `cat`, `grep`, `sed`, `awk`, `find`, `sort`, `uniq`, `wc`, `diff`, `cp`, `mv`, `rm`, `mkdir`, `tar`, `gzip` и другие команды через [ios_system](https://github.com/holzschu/ios_system) (движок a-Shell). Без эмуляции и без ПК.
-- **Git** — встроенный libgit2: `init`, `status`, `add`, `reset`, `commit -m`, `log`, `diff`, `branch`, `checkout`, `rev-parse`, `remote`, `config`, `clone`.
-- **Python 3.9.10** — локальный интерпретатор со стандартной библиотекой: `python3 script.py`, `python3 -c "..."`. Без pip, ssl/sqlite3 и компиляторов.
-- **OpenCode Zen** — бесплатный режим `Bearer public`, вход в аккаунт OpenCode через device-flow (Google/GitHub в Safari) или свой API-ключ.
-- **Нативный интерфейс SwiftUI** — Liquid Glass на iOS 26, material-fallback на iOS 17–25: чат, сессии, модели, файлы, редактор, терминал и настройки. Без WebView.
-
-## Чего здесь нет и почему
-
-iOS не разрешает запускать произвольные бинарники и фоновые Linux-процессы. Поэтому:
-
-- нет `opencode serve` и proot внутри приложения;
-- нет Node.js/npm и компиляторов;
-- Python 3.9 и git работают через встроенные libgit2/CPython, но без pip, ssl/sqlite3 и сборки нативных пакетов;
-- агент не запускает `npm test` или `cargo build`;
-- вместо этого — встроенный Unix-набор `ios_system` и файловые инструменты;
-- приложение не работает в фоне как сервер (iOS усыпляет процесс).
-
-Это не «настоящий бинарник opencode», а максимально близкий автономный агент в рамках песочницы iOS.
-
-## Бесплатные модели
-
-Приложение сначала пробует анонимный режим OpenCode Zen: `Authorization: Bearer public` — ровно тот же sentinel, который использует официальный клиент. Если серверная квота для вашего IP ещё не исчерпана, всё работает сразу после установки.
-
-Если приходит `429 Free usage limit reached`:
-
-- **Войти в аккаунт OpenCode** — Настройки → Аккаунт opencode → «Войти через Google / GitHub». Откроется страница opencode.ai, код уже подставлен. Это даёт личную квоту.
-- **Свой API-ключ** — Настройки → Модели → Подключить провайдера → OpenCode Zen, либо Настройки → Аккаунт opencode.
-- **OpenCode Go** — если нужен стабильный лимит.
-
-Квота считается на стороне OpenCode; подделка заголовков клиента её не создаёт.
+- **Нативный интерфейс** — SwiftUI + Liquid Glass на iOS 26, material-fallback на iOS 17–25. Чаты, сессии, модели, файлы, редактор, терминал и настройки.
+- **Рабочая папка** — `Файлы → На iPhone → OpenCode`. Туда кладутся проекты; агент читает и меняет файлы на устройстве.
+- **AI-агент** — потоковые ответы, размышления, tool-cards, diff, todo, история сессий.
+- **Unix-терминал** — `ls`, `cat`, `grep`, `sed`, `awk`, `find`, `sort`, `uniq`, `wc`, `diff`, `cp`, `mv`, `rm`, `mkdir`, `tar`, `gzip` и другие команды через [ios_system](https://github.com/holzschu/ios_system).
+- **Git** — libgit2: `init`, `status`, `add`, `reset`, `commit -m`, `log`, `diff`, `branch`, `checkout`, `rev-parse`, `remote`, `config`, `clone`.
+- **Python 3.9 (beta)** — `python3 script.py`, `python3 -c "..."`. Рантайм загружается динамически: если он несовместим с устройством, приложение показывает ошибку вместо падения. Без pip/ssl/sqlite3.
+- **OpenCode Zen** — анонимный режим `Bearer public`, вход в аккаунт OpenCode по device-flow (Google/GitHub в Safari) или свой API-ключ.
+- **`config.json`** — редактируется в «Файлах» или в Настройках: `model`, `agents`, `permissions`, `instructions`, `providers` и остальная структура OpenCode.
 
 ## Установка
 
-Скачайте `OpenCode-iOS-*.ipa` из [Releases](https://github.com/SanekYo-tech/ocm-ios/releases/latest).
+Скачай `OpenCode-iOS-*.ipa` из [Releases](https://github.com/SanekYo-tech/ocm-ios/releases/latest).
 
-`.ipa` **без подписи**. iOS не устанавливает неподписанный код, поэтому подпишите его своим Apple ID:
+IPA **без подписи**. Подпиши своим Apple ID через **Sideloadly**, **AltStore** или **SideStore**:
 
-- **Sideloadly** (Windows/macOS) — самый простой разовый вариант;
-- **AltStore / SideStore** — переподпись на устройстве;
-- **Feather** — если есть сертификат Apple Developer;
-- **TrollStore** — только iOS 14.0–17.0 (не 18/26).
+1. Включи Developer Mode и доверь профиль разработчика.
+2. Бесплатный Apple ID: приложение живёт 7 дней, затем переподписать.
+3. TrollStore — только iOS 14.0–17.0.
 
-Бесплатный Apple ID: приложение работает 7 дней, потом переподписать. Данные сохраняются при том же bundle ID.
+Требования: **iOS 17+**, arm64. Liquid Glass — на iOS 26; на iOS 17–25 используется material-fallback.
 
-Требования: iOS 17+, arm64; Liquid Glass — на iOS 26, на iOS 17–25 — material-fallback.
+## Бесплатная квота
+
+Приложение не делает запрос к модели, пока ты не отправишь сообщение. Если приходит `429 FreeUsageLimitError`, это ответ сервера OpenCode: анонимная квота исчерпана.
+
+- **Войти в аккаунт** — Настройки → Аккаунт opencode → Google/GitHub. Код входа подставляется автоматически.
+- **Свой ключ** — Настройки → Аккаунт opencode → API-ключ.
+- **Проверка** — Настройки → Диагностика: счётчик модельных запросов, режим авторизации и кнопка «Проверить бесплатный доступ».
+
+Квота считается на стороне OpenCode; подмена заголовков её не создаёт. Приложение отправляет официальный User-Agent OpenCode для совместимости с Console.
+
+## config.json
+
+Файл лежит в `OpenCode/config.json` и виден в приложении «Файлы».
+
+- `model`, `small_model`, `default_agent`;
+- `agents` / `agent` — свои агенты, `system`/`prompt`, `model`, `mode`;
+- `permissions` / `permission` — запрет `bash`, `edit`, `read`, `webfetch`;
+- `instructions` + `AGENTS.md` — правила проекта;
+- `providers.opencode.options.apiKey` — ключ OpenCode Console;
+- `mcp`, `plugins`, `compaction`, `watcher`, `snapshots` — структура сохраняется; приложение читает то, что умеет;
+- JSONC-комментарии поддерживаются.
+
+## Ограничения
+
+- Нет Node.js/npm и компиляторов.
+- Python beta: нет pip, ssl, sqlite3 и нативных пакетов.
+- Git: нет `pull`/`push`; `clone` работает через HTTPS.
+- iOS не разрешает фоновый сервер и произвольные бинарники.
 
 ## Сборка
 
@@ -85,38 +65,13 @@ xcodebuild archive -project OpenCodeMobile.xcodeproj -scheme OpenCodeMobile \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 ```
 
-Затем `Payload/OpenCodeMobile.app` упаковывается в `.ipa`. Workflow: `.github/workflows/ios.yml`.
-
-## Структура
-
-```
-Sources/
-  AgentEngine.swift      мини-opencode API: сессии, сообщения, SSE, файлы, prompt loop
-  AgentStore.swift       workspace, JSON-хранилище сессий, diff'ов, todo
-  ZenClient.swift        OpenCode Zen: модели, device-flow, стриминг, tool calls
-  ShellShim.m            мост к ios_system (stdout/stderr, песочница)
-  ShellRunner.swift      последовательный запуск Unix-команд
-  NativeRootView.swift   TabView + Liquid Glass
-  NativeChatStore.swift  нативное состояние чата и SSE-события
-  NativeChatView.swift   чат, сессии, выбор модели
-  NativeFilesView.swift  файловый менеджер и редактор
-  NativeTerminalView.swift  нативный терминал ios_system
-  NativeSettingsView.swift  аккаунт, config.json, диагностика
-  NativeTheme.swift      Liquid Glass, markdown, tool cards
-Vendor/                  ios_system, files, shell, text, awk, tar (xcframework)
-```
+`Payload/OpenCodeMobile.app` упаковывается в `.ipa`. Workflow: `.github/workflows/ios.yml`.
 
 ## Лицензии
 
 - Код приложения — MIT (`LICENSE`).
-- [ios_system](https://github.com/holzschu/ios_system) и command frameworks — BSD-3-Clause, © Nicolas Holzschuch. См. `THIRD_PARTY.md`.
+- [ios_system](https://github.com/holzschu/ios_system) и command frameworks — BSD-3-Clause, © Nicolas Holzschuch.
+- libgit2 — GPL-2.0 с linking exception.
+- OpenSSL — Apache 2.0 / OpenSSL License; libssh2 — BSD-3-Clause.
+- CPython — Python Software Foundation License 2.
 - OpenCode — MIT, © Anomaly / opencode contributors. Проект не связан с командой OpenCode.
-
-## Сообщество
-
-- Telegram Android-версии: [t.me/OpenCodeMob](https://t.me/OpenCodeMob)
-- Официальный OpenCode: [opencode.ai](https://opencode.ai)
-
----
-
-**Сделано для He.** ❤️

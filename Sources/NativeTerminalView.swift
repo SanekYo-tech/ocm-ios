@@ -96,7 +96,7 @@ struct NativeTerminalView: View {
         OpenCode shell · ios_system
         Workspace: \(AgentPaths.workspace.path)
         git: init/status/add/commit/log/diff/branch/checkout
-        python3: script.py или -c "…"
+        python3: script.py или -c "…" (beta)
         help — список команд
         """
     }
@@ -116,7 +116,7 @@ struct NativeTerminalView: View {
             output += """
             ls cat cd pwd echo grep sed awk find sort uniq wc diff cp mv rm mkdir touch chmod tar gzip
             git init/status/add/reset/commit -m/log/diff/branch/checkout/rev-parse/remote/config/clone
-            python3 script.py | python3 -c "код"
+            python3 script.py | python3 -c "код" (beta)
             Нет node, npm, pip, ssl, sqlite3 и компиляторов.
             """
             return

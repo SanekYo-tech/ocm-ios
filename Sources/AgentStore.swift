@@ -51,7 +51,7 @@ enum AgentPaths {
             - Работай только внутри папки OpenCode.
             - Сначала прочитай relevant files, потом меняй.
             - Git есть (libgit2): init/status/add/commit/log/diff/branch/checkout.
-            - Python 3.9 есть: python3 script.py и python3 -c "код"; без pip/ssl/sqlite3.
+            - Python 3.9 beta: python3 script.py и python3 -c "код"; без pip/ssl/sqlite3.
             - Не запускай node/npm и компиляторы — их нет на iOS.
             - Для команд используй встроенный Unix-shell (ls, cat, grep, sed, awk, find, diff, tar).
             - Отвечай на языке пользователя.

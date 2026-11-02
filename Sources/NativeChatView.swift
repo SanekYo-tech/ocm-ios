@@ -5,6 +5,7 @@ struct NativeChatView: View {
     @State private var text = ""
     @FocusState private var focused: Bool
     @State private var showError = false
+    @State private var showAccount = false
 
     var body: some View {
         NavigationStack {
@@ -75,13 +76,24 @@ struct NativeChatView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
-            .alert("Ошибка", isPresented: Binding(
+            .alert(quotaError ? "Нужен вход" : "Ошибка", isPresented: Binding(
                 get: { store.errorMessage != nil },
                 set: { if !$0 { store.errorMessage = nil } }
             )) {
+                if quotaError {
+                    Button("Войти") {
+                        store.errorMessage = nil
+                        showAccount = true
+                    }
+                }
                 Button("Закрыть", role: .cancel) { store.errorMessage = nil }
             } message: {
                 Text(store.errorMessage ?? "")
+            }
+            .sheet(isPresented: $showAccount) {
+                NavigationStack {
+                    AccountView(account: NativeAccountModel())
+                }
             }
             .onAppear { store.bootstrap() }
         }
@@ -102,7 +114,7 @@ struct NativeChatView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .padding(.horizontal, 30)
-            Text("Опиши задачу — агент прочитает файлы, выполнит команды и покажет изменения. Git и Python работают локально.")
+            Text("Опиши задачу — агент прочитает файлы, выполнит команды и покажет изменения. Git и Python (beta) работают локально.")
                 .font(.system(size: 14))
                 .foregroundStyle(OCTheme.muted)
                 .multilineTextAlignment(.center)
@@ -235,6 +247,11 @@ struct NativeChatView: View {
         .padding(.top, 6)
         .padding(.bottom, 4)
         .background(.clear)
+    }
+
+    private var quotaError: Bool {
+        let text = (store.errorMessage ?? "").lowercased()
+        return text.contains("квот") || text.contains("quota") || text.contains("лимит")
     }
 
     private var modelName: String {

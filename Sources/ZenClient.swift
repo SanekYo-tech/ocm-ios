@@ -50,6 +50,7 @@ final class ZenClient {
     static let shared = ZenClient()
 
     private let base = "https://opencode.ai/inference/openai/v1"
+    private let userAgent = "opencode/release/2.1.0/opencode"
     private let console = "https://opencode.ai/console"
     private let config = ServerConfig.shared
     private let lock = NSRecursiveLock()
@@ -65,6 +66,26 @@ final class ZenClient {
     }()
 
     var onAuthEvent: (([String: Any]) -> Void)?
+    private let counterLock = NSLock()
+    private var requestCounter = 0
+    private var lastRequest = "—"
+
+    var modelRequestCount: Int {
+        counterLock.lock(); defer { counterLock.unlock() }
+        return requestCounter
+    }
+
+    var lastRequestInfo: String {
+        counterLock.lock(); defer { counterLock.unlock() }
+        return lastRequest
+    }
+
+    private func record(status: Int, model: String, note: String = "") {
+        counterLock.lock()
+        requestCounter += 1
+        lastRequest = "\(model) · HTTP \(status)" + (note.isEmpty ? "" : " · \(note)")
+        counterLock.unlock()
+    }
 
     static let fallbackModels: [ZenModel] = [
         ZenModel(id: "big-pickle", name: "Big Pickle", context: 200_000, maxOutput: 32_000, free: true, tools: true, reasoning: true),
@@ -120,7 +141,7 @@ final class ZenClient {
         guard let url = URL(string: "https://opencode.ai/inference/v1/models") else { return }
         var req = URLRequest(url: url)
         req.timeoutInterval = 20
-        req.setValue("OpenCode-Mobile-iOS", forHTTPHeaderField: "User-Agent")
+        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
@@ -323,6 +344,36 @@ final class ZenClient {
         DispatchQueue.main.async { [weak self] in self?.onAuthEvent?(payload) }
     }
 
+    /// A user-triggered minimal request that reports exactly what OpenCode Zen says.
+    func probeFreeAccess() async -> String {
+        let token = await currentToken()
+        let model = config.zenModel.isEmpty ? "big-pickle" : config.zenModel
+        guard let url = URL(string: base + "/chat/completions") else { return "Некорректный URL" }
+        let body: [String: Any] = [
+            "model": model,
+            "messages": [["role": "user", "content": "ping"]],
+            "max_tokens": 1,
+            "stream": false
+        ]
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 30
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            record(status: status, model: model, note: "probe")
+            let text = String(decoding: data, as: UTF8.self)
+            return "HTTP \(status)\n\(String(text.prefix(1500)))"
+        } catch {
+            record(status: 0, model: model, note: "probe error")
+            return shortError(error)
+        }
+    }
+
     // MARK: - streaming chat
 
     func stream(model: String,
@@ -349,13 +400,15 @@ final class ZenClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("OpenCode-Mobile-iOS", forHTTPHeaderField: "User-Agent")
+        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
 
         let (bytes, response) = try await session.bytes(for: req)
         guard let http = response as? HTTPURLResponse else {
+            record(status: 0, model: model, note: "no response")
             throw ZenError(status: 0, message: "Нет ответа от API")
         }
+        record(status: http.statusCode, model: model)
         if !(200..<300).contains(http.statusCode) {
             var data = Data()
             for try await b in bytes {

@@ -104,13 +104,10 @@ struct NativeSettingsView: View {
                     Link(destination: URL(string: "https://opencode.ai")!) {
                         Label("opencode.ai", systemImage: "globe")
                     }
-                    Link(destination: URL(string: "https://t.me/OpenCodeMob")!) {
-                        Label("Telegram", systemImage: "paperplane")
-                    }
                 }
 
                 Section {
-                    Text("Бесплатные модели OpenCode Zen пробуются автоматически. Если серверная квота исчерпана — войди в аккаунт или добавь API-ключ. Git и Python работают полностью на устройстве.")
+                    Text("Бесплатные модели OpenCode Zen пробуются автоматически. Если серверная квота исчерпана — войди в аккаунт или добавь API-ключ. Git и Python (beta) работают на устройстве.")
                         .font(.system(size: 12))
                         .foregroundStyle(OCTheme.muted)
                 }
@@ -427,18 +424,35 @@ struct DiagnosticsView: View {
     @State private var output = ""
     @State private var busy = false
 
+    private var requestInfo: String {
+        let zen = ZenClient.shared
+        let mode: String
+        if zen.isLoggedIn { mode = "аккаунт OpenCode" }
+        else if zen.hasKey { mode = "API-ключ" }
+        else { mode = "анонимный public" }
+        return "Модельных запросов с запуска: \(zen.modelRequestCount)\nРежим: \(mode)\nПоследний: \(zen.lastRequestInfo)"
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Проверка локального окружения. Первый запуск Python может занять пару секунд.")
+                Text("Проверка локального окружения. Python загружается динамически: если рантайм не подходит устройству, вы получите ошибку, а не вылет.")
                     .font(.system(size: 12))
                     .foregroundStyle(OCTheme.muted)
 
+                Text(requestInfo)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(OCTheme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(OCTheme.bg2, in: RoundedRectangle(cornerRadius: 10))
+
                 VStack(spacing: 8) {
+                    diagButton("Проверить бесплатный доступ (1 запрос)", command: "__probe__")
                     diagButton("Shell: pwd + ls", command: "pwd; echo ---; ls -la")
+                    diagButton("Python: 6 × 7 (beta)", command: "python3 -c \"print(6*7)\")
+                    diagButton("Python: версия (beta)", command: "python3 -c \"import sys; print(sys.version)\")
                     diagButton("Git: --version", command: "git --version")
-                    diagButton("Python: 6 × 7", command: "python3 -c \"print(6*7)\"")
-                    diagButton("Python: версия", command: "python3 -c \"import sys; print(sys.version)\"")
                 }
 
                 if busy {
@@ -491,6 +505,17 @@ struct DiagnosticsView: View {
     private func run(_ command: String) {
         guard !busy else { return }
         busy = true
+        if command == "__probe__" {
+            output += "\n> проверка OpenCode Zen (реальный запрос, 1 токен)\n"
+            Task {
+                let result = await ZenClient.shared.probeFreeAccess()
+                await MainActor.run {
+                    output += result + "\n"
+                    busy = false
+                }
+            }
+            return
+        }
         output += "\n$ \(command)\n"
         Task.detached(priority: .userInitiated) {
             let result = ShellRunner.shared.run(command, cwd: AgentPaths.workspace.path, timeout: 60)
@@ -528,19 +553,15 @@ struct AboutView: View {
                     .font(.system(size: 13))
             }
             Section("Ограничения iOS") {
-                Text("Нет Node.js/npm и компиляторов. Python работает без pip, ssl и sqlite3. Git поддерживает init/status/add/commit/log/diff/branch/checkout; pull/push пока нет.")
+                Text("Нет Node.js/npm и компиляторов. Python beta без pip/ssl/sqlite3. Git поддерживает init/status/add/commit/log/diff/branch/checkout; pull/push пока нет.")
                     .font(.system(size: 12))
                     .foregroundStyle(OCTheme.muted)
             }
             Section {
                 Link("OpenCode", destination: URL(string: "https://opencode.ai")!)
-                Link("Telegram", destination: URL(string: "https://t.me/OpenCodeMob")!)
                 Link("ios_system / a-Shell", destination: URL(string: "https://github.com/holzschu/ios_system")!)
             }
             Section {
-                Text("Сделано для He ❤️")
-                    .font(.system(size: 12))
-                    .foregroundStyle(OCTheme.muted)
             }
         }
         .scrollContentBackground(.hidden)
