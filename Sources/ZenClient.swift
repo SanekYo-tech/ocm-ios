@@ -396,8 +396,8 @@ final class ZenClient {
 
     /// A user-triggered minimal request that tries both Console gateways.
     func probeFreeAccess() async -> String {
-        let token = await currentToken()
         let model = defaultModel().isEmpty ? "big-pickle" : defaultModel()
+        let token = (self.model(model)?.free ?? false) ? "public" : await currentToken()
         var reports: [String] = []
         for base in baseCandidates {
             guard let url = URL(string: base + "/chat/completions") else {
@@ -449,8 +449,11 @@ final class ZenClient {
                 messages: [[String: Any]],
                 tools: [[String: Any]],
                 onDelta: @escaping (_ field: String, _ delta: String) -> Void) async throws -> ZenResult {
-        let token = await currentToken()
         let effectiveModel = model
+        let isFreeModel = self.model(effectiveModel)?.free ?? false
+        // Console's free tier is anonymous: the official client sends
+        // `Bearer public`, not the user's paid API key.
+        let token = isFreeModel ? "public" : await currentToken()
         let candidates = baseCandidates
         var primary: ZenError?
         for (index, base) in candidates.enumerated() {
