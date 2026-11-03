@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Serializes ios_system calls. ios_system keeps one current session, so agent tools
 /// and the visible terminal must never run a command at the same time.
@@ -256,6 +257,26 @@ final class ShellRunner {
             return nativeLS(parts, cwd: cwd)
         }
 
+        if parts.first == "echo" {
+            return (0, nativeEcho(parts, cwd: cwd), cwd)
+        }
+
+        if parts.first == "uname" {
+            let flags = Set(parts.dropFirst())
+            if flags.contains("-a") {
+                return (0, "Darwin iPhone \(ProcessInfo.processInfo.operatingSystemVersionString) arm64\n", cwd)
+            }
+            return (0, (flags.contains("-s") ? "Darwin\n" : "Darwin\n"), cwd)
+        }
+
+        if parts.first == "id" {
+            return (0, "uid=\(getuid()) gid=\(getgid())\n", cwd)
+        }
+
+        if parts.first == "sw_vers" {
+            return (127, "sw_vers: command not found (macOS-only command)\n", cwd)
+        }
+
         if OCMPythonIsCommand(command) {
             let text = OCMPythonRun(command, cwd) ?? ""
             return (Int32(OCMPythonLastExit()), text, cwd)
@@ -265,11 +286,64 @@ final class ShellRunner {
             return (Int32(OCMGitLastExit()), text, cwd)
         }
 
+        if let first = parts.first, !first.contains("/"), !first.contains("="),
+           !OCMShellHasCommand(first),
+           !["export", "unset", "set", "true", "false", "help", "test", "[",
+             "alias", "unalias", "history", "type", "command", "which", "source", ".",
+             "sh", "dash", "bash", "umask", "jobs", "bg", "fg", "wait"].contains(first) {
+            return (127, "shell: \(first): command not found\n", cwd)
+        }
+
         ensureShellInit()
 
         var code: Int32 = 0
         let text = OCMRunCommand(command, cwd, &code) ?? ""
         return (code, text, cwd)
+    }
+
+    private func nativeEcho(_ parts: [String], cwd: String) -> String {
+        var args = Array(parts.dropFirst())
+        var newline = true
+        if args.first == "-n" {
+            newline = false
+            args.removeFirst()
+        }
+        let expanded = args.map { expandVariables($0, cwd: cwd) }
+        return expanded.joined(separator: " ") + (newline ? "\n" : "")
+    }
+
+    private func expandVariables(_ input: String, cwd: String) -> String {
+        let chars = Array(input)
+        var result = ""
+        var index = 0
+        while index < chars.count {
+            if chars[index] != "$" {
+                result.append(chars[index])
+                index += 1
+                continue
+            }
+            index += 1
+            guard index < chars.count else { result.append("$"); break }
+            var name = ""
+            if chars[index] == "{" {
+                index += 1
+                while index < chars.count, chars[index] != "}" {
+                    name.append(chars[index])
+                    index += 1
+                }
+                if index < chars.count { index += 1 }
+            } else {
+                while index < chars.count, chars[index].isLetter || chars[index].isNumber || chars[index] == "_" {
+                    name.append(chars[index])
+                    index += 1
+                }
+            }
+            if name == "PWD" { result += cwd; continue }
+            if name == "SHELL" { result += (ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/sh"); continue }
+            if name == "HOME" { result += AgentPaths.workspace.path; continue }
+            result += ProcessInfo.processInfo.environment[name] ?? ""
+        }
+        return result
     }
 
     /// fast, non-recursive ls used by the terminal. ios_system's ls can wait
