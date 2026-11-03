@@ -137,10 +137,10 @@ final class ZenClient {
     /// Free models are restricted by Console to the official OpenCode client, so an
     /// authenticated third-party harness must use paid models only.
     var selectableModels: [ZenModel] {
-        // Free models are tied by Console to the official Bun client and are
-        // rejected by URLSession. With a key/login only paid models are useful.
+        // Free models are available through the BoringSSL/Bun transport;
+        // paid models need a key or Console login.
         if anonymous { return models.filter { $0.free } }
-        return models.filter { !$0.free }
+        return models
     }
 
     func defaultModel() -> String {
@@ -442,6 +442,129 @@ final class ZenClient {
         return reports.joined(separator: "\n\n")
     }
 
+    // MARK: - free transport
+
+    /// Free Console models reject URLSession/WKWebView. The official client's
+    /// Bun TLS ClientHello is reproduced by BoringTransport; this path sends
+    /// the official free-agent body through it.
+    private func streamFree(model: String,
+                            sessionID: String?,
+                            messages: [[String: Any]],
+                            tools: [[String: Any]],
+                            onDelta: @escaping (_ field: String, _ delta: String) -> Void) async throws -> ZenResult {
+        var body: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "max_tokens": 32_000,
+            "stream": true,
+            "stream_options": ["include_usage": true]
+        ]
+        if !tools.isEmpty {
+            body["tools"] = tools
+            body["tool_choice"] = "auto"
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else {
+            throw ZenError(status: 0, message: "Не удалось собрать запрос")
+        }
+        let sid = sessionID ?? newSessionID()
+        let headers: [String: String] = [
+            "Authorization": "Bearer public",
+            "Content-Type": "application/json",
+            "User-Agent": userAgent,
+            "x-opencode-client": "cli",
+            "x-opencode-project": "global",
+            "x-opencode-request": newID("msg_"),
+            "x-opencode-session": sid,
+            "x-opencode-session-id": sid,
+            "Accept": "*/*"
+        ]
+        guard let response = await BoringTransport.post(host: "opencode.ai",
+                                                        path: "/inference/openai/v1/chat/completions",
+                                                        headers: headers,
+                                                        body: data) else {
+            record(status: 0, model: model, note: "boring-free")
+            throw ZenError(status: 0, message: "Не удалось открыть TLS-соединение с Console")
+        }
+        record(status: response.status, model: model, note: "boring-free")
+        guard (200..<300).contains(response.status) else {
+            throw parseError(response.body, status: response.status)
+        }
+        return try parseSSEData(response.body, status: response.status, onDelta: onDelta)
+    }
+
+    private func parseSSEData(_ data: Data,
+                              status: Int,
+                              onDelta: @escaping (_ field: String, _ delta: String) -> Void) throws -> ZenResult {
+        let text = String(decoding: data, as: UTF8.self)
+        var result = ZenResult()
+        var calls: [Int: (id: String, name: String, args: String)] = [:]
+        var usage: [String: Any] = [:]
+        for rawLine in text.components(separatedBy: "\n") {
+            let line = rawLine.hasSuffix("\r") ? String(rawLine.dropLast()) : rawLine
+            guard line.hasPrefix("data:") else { continue }
+            let raw = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            if raw.isEmpty || raw == "[DONE]" { continue }
+            guard let obj = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any] else { continue }
+            if let err = obj["error"] as? [String: Any] {
+                let msg = err["message"] as? String ?? err["type"] as? String ?? "Ошибка модели"
+                throw ZenError(status: status, message: msg)
+            }
+            if let u = obj["usage"] as? [String: Any] {
+                usage = u
+                if let c = u["cost"] as? Double { result.cost = c }
+                else if let c = u["cost"] as? Int { result.cost = Double(c) }
+            }
+            guard let choices = obj["choices"] as? [[String: Any]],
+                  let first = choices.first else { continue }
+            let delta = first["delta"] as? [String: Any] ?? [:]
+            if let t = delta["content"] as? String, !t.isEmpty {
+                result.text += t
+                onDelta("text", t)
+            }
+            if let r = delta["reasoning_content"] as? String, !r.isEmpty {
+                result.reasoning += r
+                onDelta("reasoning", r)
+            } else if let r = delta["reasoning"] as? String, !r.isEmpty {
+                result.reasoning += r
+                onDelta("reasoning", r)
+            }
+            if let toolCalls = delta["tool_calls"] as? [[String: Any]] {
+                for tc in toolCalls {
+                    let idx = tc["index"] as? Int ?? 0
+                    var cur = calls[idx] ?? ("", "", "")
+                    if let id = tc["id"] as? String, !id.isEmpty { cur.id = id }
+                    if let fn = tc["function"] as? [String: Any] {
+                        if let n = fn["name"] as? String, !n.isEmpty { cur.name += n }
+                        if let a = fn["arguments"] as? String { cur.args += a }
+                    }
+                    calls[idx] = cur
+                }
+            }
+        }
+        if !usage.isEmpty {
+            var tokens: [String: Any] = [
+                "input": usage["prompt_tokens"] as? Int ?? 0,
+                "output": usage["completion_tokens"] as? Int ?? 0,
+                "reasoning": 0,
+                "cache": ["read": 0, "write": 0]
+            ]
+            if let opencode = usage["opencode"] as? [String: Any],
+               let t = opencode["tokens"] as? [String: Any] {
+                tokens["reasoning"] = t["reasoning"] as? Int ?? 0
+                tokens["cache"] = [
+                    "read": t["cache_read"] as? Int ?? 0,
+                    "write": t["cache_write_5m"] as? Int ?? 0
+                ]
+            }
+            result.usage = tokens
+        }
+        result.toolCalls = calls.keys.sorted().compactMap { idx in
+            guard let c = calls[idx], !c.name.isEmpty else { return nil }
+            return ZenToolCall(id: c.id.isEmpty ? newID("call_") : c.id, name: c.name, arguments: c.args)
+        }
+        return result
+    }
+
     // MARK: - streaming chat
 
     func stream(model: String,
@@ -453,7 +576,10 @@ final class ZenClient {
         let isFreeModel = self.model(effectiveModel)?.free ?? false
         // Console's free tier is anonymous: the official client sends
         // `Bearer public`, not the user's paid API key.
-        let token = isFreeModel ? "public" : await currentToken()
+        if isFreeModel {
+            return try await streamFree(model: effectiveModel, sessionID: sessionID, messages: messages, tools: tools, onDelta: onDelta)
+        }
+        let token = await currentToken()
         let candidates = baseCandidates
         var primary: ZenError?
         for (index, base) in candidates.enumerated() {

@@ -376,7 +376,7 @@ struct ModelPickerView: View {
                         }
                     }
                     Section {
-                        Text("Бесплатные модели Console пускает только официальный клиент OpenCode; в iOS-приложении с ключом доступны платные модели и Go.")
+                        Text("Бесплатные модели идут через точный Bun/BoringSSL TLS-стек OpenCode. Если Console всё равно вернёт 429, попробуй новый чат или платную модель.")
                             .font(.system(size: 12))
                             .foregroundStyle(OCTheme.muted)
                     }

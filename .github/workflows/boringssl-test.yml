@@ -1,0 +1,26 @@
+name: BoringSSL build
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          command -v cmake || brew install cmake
+          command -v ninja || brew install ninja
+          command -v go || brew install go
+          cmake --version | head -1
+          ninja --version
+          go version
+      - name: Build
+        run: |
+          chmod +x scripts/build_boringssl_ios.sh scripts/make_xcframework.sh
+          ./scripts/build_boringssl_ios.sh
+      - name: Inspect
+        run: |
+          find Vendor/BoringSSL.xcframework -maxdepth 3 -type f | head -20
+          ls -lh Vendor/BoringSSL.xcframework/*/BoringSSL.framework/BoringSSL
+          ls Vendor/BoringSSL/include/openssl/ssl.h

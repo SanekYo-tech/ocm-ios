@@ -39,6 +39,11 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
+      - name: Build BoringSSL
+        run: |
+          chmod +x scripts/build_boringssl_ios.sh scripts/make_xcframework.sh
+          ./scripts/build_boringssl_ios.sh
+
       - name: Install XcodeGen
         run: |
           set -euo pipefail

@@ -162,13 +162,6 @@ final class NativeChatStore: ObservableObject {
     func send(_ raw: String) {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !busy else { return }
-        // Free models are not callable from a native iOS HTTP stack; never
-        // silently send a saved free model and turn a real key into a 429.
-        if !zen.anonymous, let current = zen.model(selectedModel), current.free {
-            selectedModel = zen.defaultModel()
-            models = zen.selectableModels
-            UserDefaults.standard.set(selectedModel, forKey: "ocm.native.model")
-        }
         if currentSessionID == nil {
             newSession()
         }
