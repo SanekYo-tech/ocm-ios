@@ -166,9 +166,11 @@ static NSString *initializePython(void) {
         return gLoadError;
     }
 
+    NSString *dynload = [[NSBundle.mainBundle.privateFrameworksPath
+        stringByAppendingPathComponent:@"Python.framework/lib-dynload"] copy];
     NSString *bootstrap = [NSString stringWithFormat:
-        @"import sys\nfor _p in [%@, %@]:\n    if _p not in sys.path:\n        sys.path.insert(0, _p)\n",
-        pyLiteral(lib), pyLiteral([lib stringByAppendingPathComponent:@"site-packages"])];
+        @"import sys\nfor _p in [%@, %@, %@]:\n    if _p not in sys.path:\n        sys.path.insert(0, _p)\n",
+        pyLiteral(dynload), pyLiteral(lib), pyLiteral([lib stringByAppendingPathComponent:@"site-packages"])];
     pRunString(bootstrap.UTF8String);
     gReady = YES;
     return nil;

@@ -99,16 +99,19 @@ jobs:
           fi
           rm -rf "$RUNNER_TEMP/ipa"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
-          ditto "$APP" "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app"
+          PAYLOAD_APP="$RUNNER_TEMP/ipa/Payload/$APP_NAME.app"
+          ditto "$APP" "$PAYLOAD_APP"
+          # CPython extension modules must live inside the signed Python
+          # framework. Sideloaders deep-sign frameworks; .so files left in
+          # Resources were not re-signed and failed code-signature validation.
+          DYN="$PAYLOAD_APP/Frameworks/Python.framework/lib-dynload"
+          mkdir -p "$DYN"
+          cp -R "$PAYLOAD_APP/python/lib/python3.13/lib-dynload/." "$DYN/" 2>/dev/null || true
+          rm -rf "$PAYLOAD_APP/python/lib/python3.13/lib-dynload"
           # Sideloaders and TrollStore expect nested code to have at least an
           # ad-hoc signature before they re-sign the app.
-          find "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app/Frameworks" -maxdepth 1 -name '*.framework' -print0 | while IFS= read -r -d '' fw; do
+          find "$PAYLOAD_APP/Frameworks" -maxdepth 1 -name '*.framework' -print0 | while IFS= read -r -d '' fw; do
             codesign --force --deep --sign - --timestamp=none "$fw" >/dev/null 2>&1 || true
-          done
-          # CPython extension modules are Mach-O dylibs too; sign them so
-          # sideloaders that only re-sign bundles still produce loadable python.
-          find "$RUNNER_TEMP/ipa/Payload/$APP_NAME.app/python" -name '*.so' -print0 2>/dev/null | while IFS= read -r -d '' so; do
-            codesign --force --sign - --timestamp=none "$so" >/dev/null 2>&1 || true
           done
           cd "$RUNNER_TEMP/ipa"
           ditto -c -k --norsrc --keepParent Payload "$IPA"

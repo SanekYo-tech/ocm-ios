@@ -17,7 +17,7 @@ final class ShellRunner {
 
     private init() {}
 
-    private func ensureInit() {
+    private func ensureShellInit() {
         lock.lock(); defer { lock.unlock() }
         if initialized { return }
         AgentPaths.prepare()
@@ -36,7 +36,6 @@ final class ShellRunner {
     }
 
     func run(_ command: String, cwd: String? = nil, timeout: TimeInterval = 90) -> (code: Int32, output: String) {
-        ensureInit()
         let sem = DispatchSemaphore(value: 0)
         var code: Int32 = 1
         var output = ""
@@ -59,7 +58,6 @@ final class ShellRunner {
 
     func runAsync(_ command: String, cwd: String?, timeout: TimeInterval = 90,
                   completion: @escaping (Int32, String) -> Void) {
-        ensureInit()
         queue.async {
             let result = self.executeScript(command,
                                            cwd: cwd ?? AgentPaths.workspace.path,
@@ -70,7 +68,7 @@ final class ShellRunner {
     }
 
     func hasCommand(_ command: String) -> Bool {
-        ensureInit()
+        ensureShellInit()
         return OCMShellHasCommand(command)
     }
 
@@ -254,6 +252,10 @@ final class ShellRunner {
             return (0, cwd + "\n", cwd)
         }
 
+        if parts.first == "ls", !command.contains("|"), !command.contains(">"), !command.contains("<") {
+            return nativeLS(parts, cwd: cwd)
+        }
+
         if OCMPythonIsCommand(command) {
             let text = OCMPythonRun(command, cwd) ?? ""
             return (Int32(OCMPythonLastExit()), text, cwd)
@@ -263,19 +265,82 @@ final class ShellRunner {
             return (Int32(OCMGitLastExit()), text, cwd)
         }
 
-        // Do not hand a completely unknown first word to ios_system. It has a
-        // large command table, but malformed invocations can abort inside the
-        // native loader; a normal shell should report 127 instead.
-        if let first = parts.first, !first.contains("/"), !first.contains("="),
-           !OCMShellHasCommand(first),
-           !["echo", "printf", "export", "unset", "set", "true", "false", "help", "test", "[",
-             "alias", "unalias", "history", "type", "command", "which", "source", ".",
-             "sh", "dash", "bash", "umask", "jobs", "bg", "fg", "wait"].contains(first) {
-            return (127, "shell: \(first): command not found\n", cwd)
-        }
+        ensureShellInit()
 
         var code: Int32 = 0
         let text = OCMRunCommand(command, cwd, &code) ?? ""
         return (code, text, cwd)
+    }
+
+    /// fast, non-recursive ls used by the terminal. ios_system's ls can wait
+    /// on its file coordinator while the app is busy; this path is synchronous
+    /// and covers the normal `ls`, `ls -l`, `ls -la` cases.
+    private func nativeLS(_ parts: [String], cwd: String) -> (code: Int32, output: String, cwd: String) {
+        var long = false, all = false, one = false
+        var paths: [String] = []
+        for part in parts.dropFirst() {
+            if part.hasPrefix("-") && part != "-" {
+                for flag in part.dropFirst() {
+                    if flag == "l" { long = true }
+                    if flag == "a" { all = true }
+                    if flag == "1" { one = true }
+                }
+            } else {
+                paths.append(part)
+            }
+        }
+        if paths.isEmpty { paths = ["."] }
+
+        var lines: [String] = []
+        for raw in paths {
+            let candidate = raw.hasPrefix("/") ? raw : cwd + "/" + raw
+            guard let url = AgentPaths.resolve(candidate) else {
+                lines.append("ls: \(raw): No such file or directory")
+                continue
+            }
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else {
+                lines.append("ls: \(raw): No such file or directory")
+                continue
+            }
+            let urls: [URL]
+            if isDir.boolValue {
+                urls = (try? FileManager.default.contentsOfDirectory(
+                    at: url,
+                    includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .posixPermissionsKey],
+                    options: [])) ?? []
+            } else {
+                urls = [url]
+            }
+            let filtered = urls.filter { all || !$0.lastPathComponent.hasPrefix(".") }
+                .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            if paths.count > 1, isDir.boolValue { lines.append(raw + ":") }
+            for item in filtered {
+                let name = item.lastPathComponent
+                if !long && !one {
+                    lines.append(name)
+                } else {
+                    var itemIsDir: ObjCBool = false
+                    FileManager.default.fileExists(atPath: item.path, isDirectory: &itemIsDir)
+                    let values = try? item.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .posixPermissionsKey])
+                    let perm = values?.posixPermissions ?? 0
+                    let kind = itemIsDir.boolValue ? "d" : "-"
+                    var mode = kind
+                    let bits: [(Int, String)] = [(0o400, "r"), (0o200, "w"), (0o100, "x"),
+                                                 (0o040, "r"), (0o020, "w"), (0o010, "x"),
+                                                 (0o004, "r"), (0o002, "w"), (0o001, "x")]
+                    for (mask, char) in bits { mode += (perm & mask) != 0 ? char : "-" }
+                    let size = itemIsDir.boolValue ? 0 : (values?.fileSize ?? 0)
+                    let date = values?.contentModificationDate ?? Date(timeIntervalSince1970: 0)
+                    let df = DateFormatter()
+                    df.locale = Locale(identifier: "en_US_POSIX")
+                    df.dateFormat = "MMM dd HH:mm"
+                    lines.append("\(mode) 1 mobile mobile \(size) \(df.string(from: date)) \(name)")
+                }
+            }
+            if paths.count > 1, isDir.boolValue { lines.append("") }
+        }
+        if let last = lines.last, last.isEmpty { lines.removeLast() }
+        return (0, lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n", cwd)
     }
 }
