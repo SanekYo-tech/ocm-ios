@@ -1,0 +1,70 @@
+name: WKWebView test
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate body
+        run: |
+          python3 - <<'PY'
+          import json, base64
+          prof=json.load(open('Resources/free-agent.json'))
+          out=[]
+          for line in prof['system'].splitlines():
+              st=line.lstrip(' '); lead=line[:len(line)-len(st)]
+              for prefix,val in [('Working directory: ','/var/mobile/Containers/Data/Application/ABC/Documents'),('Workspace root folder: ','/var/mobile/Containers/Data/Application/ABC/Documents'),('Is directory a git repo: ','no'),('Platform: ','ios'),("Today's date: ",'Tue Nov 03 2026')]:
+                  if st.startswith(prefix): st=prefix+val
+              out.append(lead+st)
+          body={"model":"big-pickle","max_tokens":32000,"messages":[{"role":"system","content":'\n'.join(out)},{"role":"user","content":"Reply with exactly OK"}],"tools":prof['tools'],"tool_choice":"auto","stream":False}
+          open('/tmp/body.b64','w').write(base64.b64encode(json.dumps(body).encode()).decode())
+          import time,secrets
+          chars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+          def ident(desc):
+            ts=int(time.time()*1000); v=ts*0x1000+1
+            if desc: v=~v
+            v &= (1<<48)-1
+            return format(v,'012x')+''.join(secrets.choice(chars) for _ in range(14))
+          open('/tmp/ids','w').write('ses_'+ident(True)+'\n'+'msg_'+ident(False)+'\n')
+          PY
+      - name: WKWebView
+        run: |
+          cat > /tmp/wk.swift <<'SWIFT'
+          import Cocoa
+          import WebKit
+          let app = NSApplication.shared
+          app.setActivationPolicy(.prohibited)
+          let body64 = try! String(contentsOfFile: "/tmp/body.b64").trimmingCharacters(in: .whitespacesAndNewlines)
+          let ids = try! String(contentsOfFile: "/tmp/ids").split(separator: "\n").map(String.init)
+          let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 2, height: 2))
+          web.customUserAgent = "opencode/1.19.5 ai-sdk/provider-utils/4.0.23 runtime/bun/1.4.4"
+          final class D: NSObject, WKNavigationDelegate {
+              let web: WKWebView; let body64: String; let ids: [String]
+              init(_ web: WKWebView, _ body64: String, _ ids: [String]) { self.web=web; self.body64=body64; self.ids=ids }
+              func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+                  let js = """
+                  const body = JSON.parse(atob('\(body64)'));
+                  const r = await fetch('/inference/openai/v1/chat/completions', {method:'POST', headers:{
+                    'Authorization':'Bearer public','Content-Type':'application/json',
+                    'x-opencode-client':'cli','x-opencode-project':'global',
+                    'x-opencode-request':'\(ids[1])','x-opencode-session':'\(ids[0])','x-opencode-session-id':'\(ids[0])'
+                  }, body: JSON.stringify(body)});
+                  return r.status + '\\n' + (await r.text()).slice(0,700);
+                  """
+                  webView.callAsyncJavaScript(js, arguments: [:], in: nil, in: .page) { result in
+                      print("RESULT", result as Any)
+                      app.terminate(nil)
+                  }
+              }
+              func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { print("NAVFAIL", error); app.terminate(nil) }
+              func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { print("PROVFAIL", error); app.terminate(nil) }
+          }
+          let delegate = D(web, body64, ids)
+          web.navigationDelegate = delegate
+          web.load(URLRequest(url: URL(string: "https://opencode.ai/")!))
+          DispatchQueue.main.asyncAfter(deadline: .now() + 45) { print("TIMEOUT"); app.terminate(nil) }
+          app.run()
+          SWIFT
+          swift /tmp/wk.swift
