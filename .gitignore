@@ -5,3 +5,7 @@ DerivedData/
 *.ipa
 *.xcodeproj
 xcuserdata/
+.build/
+Vendor/boringssl/
+Vendor/BoringSSL/
+Vendor/BoringSSL.xcframework/
