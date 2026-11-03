@@ -131,7 +131,8 @@ private func opencodeIdentifier(descending: Bool) -> String {
     var result = ""
     for index in 0..<6 {
         let byte = (value >> UInt64(40 - index * 8)) & 0xff
-        result += String(format: "%02x", byte)
+        let hex = String(byte, radix: 16)
+        result += String(repeating: "0", count: max(0, 2 - hex.count)) + hex
     }
     let alphabet = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
     for _ in 0..<14 {
