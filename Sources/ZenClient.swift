@@ -466,6 +466,10 @@ final class ZenClient {
         guard let data = try? JSONSerialization.data(withJSONObject: body) else {
             throw ZenError(status: 0, message: "Не удалось собрать запрос")
         }
+        if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
+            let path = AgentPaths.workspace.appendingPathComponent("boring-body.json")
+            try? data.write(to: path)
+        }
         let sid = sessionID ?? newSessionID()
         let headers: [String: String] = [
             "Authorization": "Bearer public",

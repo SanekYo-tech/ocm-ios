@@ -30,10 +30,10 @@ struct RootView: View {
             if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
                 Task {
                     let path = AgentPaths.workspace.appendingPathComponent("boring-test.txt")
-                    try? "START\n".write(to: path, atomically: true, encoding: .utf8)
                     let model = "big-pickle"
                     let sid = newSessionID()
                     let profile = FreeAgentProfile.shared
+                    try? "START available=\(profile.available) system=\(profile.system(model: model).count) tools=\(profile.tools(readOnly: false).count)\n".write(to: path, atomically: true, encoding: .utf8)
                     let messages: [[String: Any]] = [
                         ["role": "system", "content": profile.system(model: model)],
                         ["role": "user", "content": "Reply with exactly OK"]
