@@ -121,31 +121,14 @@ struct NativeTerminalView: View {
             """
             return
         }
-        if raw == "cd" {
-            cwd = AgentPaths.workspace.path
-            return
-        }
-        if raw.hasPrefix("cd ") {
-            let target = String(raw.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-            let candidate = target.hasPrefix("/") ? target : cwd + "/" + target
-            if let url = AgentPaths.resolve(candidate) {
-                var isDir: ObjCBool = false
-                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                    cwd = url.path
-                } else {
-                    output += "cd: no such directory\n"
-                }
-            } else {
-                output += "cd: outside workspace\n"
-            }
-            return
-        }
         busy = true
         let workdir = cwd
         Task.detached(priority: .userInitiated) {
             let result = ShellRunner.shared.run(raw, cwd: workdir, timeout: 120)
             await MainActor.run {
                 busy = false
+                let finalDirectory = ShellRunner.shared.lastWorkingDirectory
+                if !finalDirectory.isEmpty { cwd = finalDirectory }
                 if !result.output.isEmpty {
                     output += result.output
                     if !result.output.hasSuffix("\n") { output += "\n" }
