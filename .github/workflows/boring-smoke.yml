@@ -33,14 +33,6 @@ jobs:
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/SimDerived" \
             ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
-      - name: Local TLS listener
-        run: |
-          sudo python3 - <<'PY' > "$RUNNER_TEMP/hello.log" 2>&1 &
-          import socket
-          s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(('0.0.0.0',443)); s.listen(1)
-          c,_=s.accept(); b=c.recv(65535); open('$RUNNER_TEMP/hello.hex','w').write(b.hex()); c.close(); s.close()
-          PY
-          sleep 2
       - name: Launch
         run: |
           APP="$RUNNER_TEMP/SimDerived/Build/Products/Debug-iphonesimulator/OpenCodeMobile.app"
@@ -48,6 +40,13 @@ jobs:
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
+          sudo python3 - <<'PY' > "$RUNNER_TEMP/hello.log" 2>&1 &
+          import socket
+          s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(('0.0.0.0',443)); s.listen(2)
+          c,_=s.accept(); b=c.recv(65535); open('$RUNNER_TEMP/hello.hex','w').write(b.hex()); c.close(); s.close()
+          PY
+          SRV=$!
+          sleep 2
           SIMCTL_CHILD_OCM_BORING_TEST=1 SIMCTL_CHILD_OCM_BORING_LOCAL=1 xcrun simctl launch "$UDID" app.opencodemob.ios
           sleep 50
           CONTAINER=$(xcrun simctl get_app_container "$UDID" app.opencodemob.ios data)
@@ -57,6 +56,8 @@ jobs:
           cat "$CONTAINER/Documents/boring-local.txt" || true
           head -c 500 "$CONTAINER/Documents/boring-body.json" || true
           echo; echo HELLO; cat "$RUNNER_TEMP/hello.hex" || true
+          kill "$SRV" 2>/dev/null || true
+          wait "$SRV" 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
