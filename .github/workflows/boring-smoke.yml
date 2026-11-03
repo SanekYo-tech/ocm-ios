@@ -47,7 +47,7 @@ jobs:
           PY
           SRV=$!
           sleep 2
-          SIMCTL_CHILD_OCM_BORING_TEST=1 SIMCTL_CHILD_OCM_BORING_LOCAL=1 xcrun simctl launch "$UDID" app.opencodemob.ios
+          SIMCTL_CHILD_OCM_BORING_TEST=1 xcrun simctl launch "$UDID" app.opencodemob.ios
           sleep 50
           CONTAINER=$(xcrun simctl get_app_container "$UDID" app.opencodemob.ios data)
           echo "CONTAINER=$CONTAINER"
