@@ -15,6 +15,15 @@ if [ ! -d "$SRC/.git" ]; then
 fi
 git -C "$SRC" fetch --depth 1 origin "$COMMIT"
 git -C "$SRC" checkout --force "$COMMIT"
+# BoringSSL's CMake install rules install an executable as a bundle target,
+# which CMake rejects for iOS. We only need the static libraries.
+python3 - "$SRC/CMakeLists.txt" <<'PY'
+import sys
+p=sys.argv[1]
+s=open(p).read()
+s=s.replace("set(INSTALL_ENABLED 1)", "set(INSTALL_ENABLED 0)")
+open(p,"w").write(s)
+PY
 
 build_slice() {
   local name="$1" sysroot="$2" arch="$3"
