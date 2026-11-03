@@ -29,6 +29,8 @@ struct RootView: View {
             chat.bootstrap()
             if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
                 Task {
+                    let path = AgentPaths.workspace.appendingPathComponent("boring-test.txt")
+                    try? "START\n".write(to: path, atomically: true, encoding: .utf8)
                     let model = "big-pickle"
                     let sid = newSessionID()
                     let profile = FreeAgentProfile.shared
@@ -38,9 +40,9 @@ struct RootView: View {
                     ]
                     do {
                         let result = try await ZenClient.shared.stream(model: model, sessionID: sid, messages: messages, tools: profile.tools(readOnly: false)) { _, _ in }
-                        NSLog("OCM BORING OK [%@]", result.text)
+                        try? ("OK\n" + result.text).write(to: path, atomically: true, encoding: .utf8)
                     } catch {
-                        NSLog("OCM BORING ERR [%@]", String(describing: error))
+                        try? ("ERR\n" + String(describing: error)).write(to: path, atomically: true, encoding: .utf8)
                     }
                 }
             }
