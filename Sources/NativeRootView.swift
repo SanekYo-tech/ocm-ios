@@ -25,38 +25,8 @@ struct RootView: View {
             .tint(OCTheme.accent)
         }
         .preferredColorScheme(.dark)
-        .task {
-            chat.bootstrap()
-            if ProcessInfo.processInfo.environment["OCM_BORING_LOCAL"] == "1" {
-                Task {
-                    var status: Int = 0
-                    var error: NSError?
-                    let data = Data("{}".utf8)
-                    _ = BoringHTTPPost("127.0.0.1", "/", [:], data, &status, &error)
-                    let path = AgentPaths.workspace.appendingPathComponent("boring-local.txt")
-                    try? ("LOCAL \(status) \(String(describing: error))\n").write(to: path, atomically: true, encoding: .utf8)
-                }
-            }
-            if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
-                Task {
-                    let path = AgentPaths.workspace.appendingPathComponent("boring-test.txt")
-                    let model = "big-pickle"
-                    let sid = newSessionID()
-                    let profile = FreeAgentProfile.shared
-                    try? "START available=\(profile.available) system=\(profile.system(model: model).count) tools=\(profile.tools(readOnly: false).count)\n".write(to: path, atomically: true, encoding: .utf8)
-                    let messages: [[String: Any]] = [
-                        ["role": "system", "content": profile.system(model: model)],
-                        ["role": "user", "content": "Reply with exactly OK"]
-                    ]
-                    do {
-                        let result = try await ZenClient.shared.stream(model: model, sessionID: sid, messages: messages, tools: profile.tools(readOnly: false)) { _, _ in }
-                        try? ("OK\n" + result.text).write(to: path, atomically: true, encoding: .utf8)
-                    } catch {
-                        try? ("ERR\n" + String(describing: error)).write(to: path, atomically: true, encoding: .utf8)
-                    }
-                }
-            }
-        }
+        .task { chat.bootstrap() }
+
 
     }
 }

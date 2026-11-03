@@ -466,10 +466,6 @@ final class ZenClient {
         guard let data = try? JSONSerialization.data(withJSONObject: body) else {
             throw ZenError(status: 0, message: "Не удалось собрать запрос")
         }
-        if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
-            let path = AgentPaths.workspace.appendingPathComponent("boring-body.json")
-            try? data.write(to: path)
-        }
         let sid = sessionID ?? newSessionID()
         let headers: [String: String] = [
             "Authorization": "Bearer public",
@@ -482,10 +478,6 @@ final class ZenClient {
             "x-opencode-session-id": sid,
             "Accept": "*/*"
         ]
-        if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
-            let hpath = AgentPaths.workspace.appendingPathComponent("boring-headers.txt")
-            try? headers.map { "\($0.key): \($0.value)" }.joined(separator: "\n").write(to: hpath, atomically: true, encoding: .utf8)
-        }
         guard let response = await BoringTransport.post(host: "opencode.ai",
                                                         path: "/inference/openai/v1/chat/completions",
                                                         headers: headers,

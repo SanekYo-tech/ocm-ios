@@ -12,13 +12,6 @@
 #include <string.h>
 #include <limits.h>
 
-static NSMutableData *gClientHello;
-static void BoringHelloCallback(int write_p, int version, int content_type, const void *buf, size_t len, SSL *ssl, void *arg) {
-    if (!write_p || content_type != 22 || !buf || len == 0) return;
-    if (!gClientHello) gClientHello = [NSMutableData data];
-    if (gClientHello.length < 65535) [gClientHello appendBytes:buf length:len];
-}
-
 static NSError *BoringError(NSString *message) {
     return [NSError errorWithDomain:@"BoringHTTP" code:1
                            userInfo:@{NSLocalizedDescriptionKey: message}];
@@ -94,9 +87,6 @@ NSData * _Nullable BoringHTTPPost(NSString *host,
         return nil;
     }
     SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
-    if (getenv("OCM_BORING_TEST")) {
-        SSL_CTX_set_msg_callback(ctx, BoringHelloCallback);
-    }
     // These two extensions, plus BoringSSL's default cipher list and ALPN,
     // reproduce Bun's ClientHello (17 ciphers / 12 extensions).
     SSL_CTX_enable_signed_cert_timestamps(ctx);
@@ -186,11 +176,6 @@ NSData * _Nullable BoringHTTPPost(NSString *host,
     SSL_free(ssl);
     SSL_CTX_free(ctx);
     close(fd);
-
-    if (getenv("OCM_BORING_TEST") && gClientHello.length) {
-        NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/boring-hello.bin"];
-        [gClientHello writeToFile:path atomically:YES];
-    }
 
     NSData *separator = [@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding];
     NSRange headerRange = [raw rangeOfData:separator options:0 range:NSMakeRange(0, raw.length)];
