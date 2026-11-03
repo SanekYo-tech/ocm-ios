@@ -5,9 +5,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/Vendor/boringssl"
+SRC="${BORINGSSL_SRC:-$ROOT/.build/boringssl}"
 OUT="$ROOT/Vendor/BoringSSL"
-FRAMEWORKS="$ROOT/Vendor/BoringSSL-build"
+FRAMEWORKS="$ROOT/.build/BoringSSL-build"
 COMMIT="629a0ef2e705964bde48ff804ea286a1fd677169"
 
 if [ ! -d "$SRC/.git" ]; then
