@@ -307,7 +307,7 @@ final class ShellRunner {
             if isDir.boolValue {
                 urls = (try? FileManager.default.contentsOfDirectory(
                     at: url,
-                    includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .posixPermissionsKey],
+                    includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey],
                     options: [])) ?? []
             } else {
                 urls = [url]
@@ -322,8 +322,9 @@ final class ShellRunner {
                 } else {
                     var itemIsDir: ObjCBool = false
                     FileManager.default.fileExists(atPath: item.path, isDirectory: &itemIsDir)
-                    let values = try? item.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .posixPermissionsKey])
-                    let perm = values?.posixPermissions ?? 0
+                    let values = try? item.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                    let attributes = try? FileManager.default.attributesOfItem(atPath: item.path)
+                    let perm = (attributes?[.posixPermissions] as? NSNumber)?.intValue ?? 0
                     let kind = itemIsDir.boolValue ? "d" : "-"
                     var mode = kind
                     let bits: [(Int, String)] = [(0o400, "r"), (0o200, "w"), (0o100, "x"),
