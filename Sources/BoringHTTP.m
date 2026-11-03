@@ -1,5 +1,6 @@
 #import "BoringHTTP.h"
 
+#define BORINGSSL_PREFIX OCMBoring
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <arpa/inet.h>

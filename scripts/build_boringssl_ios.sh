@@ -35,7 +35,8 @@ build_slice() {
     -DCMAKE_OSX_ARCHITECTURES="$arch" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBORINGSSL_PREFIX=OCMBoring
   cmake --build "$build" --target ssl crypto --parallel 2
 
   local fw="$FRAMEWORKS/$name/BoringSSL.framework"
