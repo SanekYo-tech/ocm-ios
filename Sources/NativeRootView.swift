@@ -27,6 +27,16 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .task {
             chat.bootstrap()
+            if ProcessInfo.processInfo.environment["OCM_BORING_LOCAL"] == "1" {
+                Task {
+                    var status: Int = 0
+                    var error: NSError?
+                    let data = Data("{}".utf8)
+                    _ = BoringHTTPPost("127.0.0.1", "/", [:], data, &status, &error)
+                    let path = AgentPaths.workspace.appendingPathComponent("boring-local.txt")
+                    try? ("LOCAL \(status) \(String(describing: error))\n").write(to: path, atomically: true, encoding: .utf8)
+                }
+            }
             if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
                 Task {
                     let path = AgentPaths.workspace.appendingPathComponent("boring-test.txt")
