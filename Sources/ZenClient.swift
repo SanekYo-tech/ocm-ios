@@ -491,6 +491,7 @@ final class ZenClient {
         var body: [String: Any] = [
             "model": model,
             "messages": messages,
+            "max_tokens": 32_000,
             "stream": true,
             "stream_options": ["include_usage": true]
         ]
