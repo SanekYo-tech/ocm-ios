@@ -18,7 +18,7 @@ jobs:
               for prefix,val in [('Working directory: ','/var/mobile/Containers/Data/Application/ABC/Documents'),('Workspace root folder: ','/var/mobile/Containers/Data/Application/ABC/Documents'),('Is directory a git repo: ','no'),('Platform: ','ios'),("Today's date: ",'Tue Nov 03 2026')]:
                   if st.startswith(prefix): st=prefix+val
               out.append(lead+st)
-          body={"model":"big-pickle","max_tokens":32000,"messages":[{"role":"system","content":'\n'.join(out)},{"role":"user","content":"Reply with exactly OK"}],"tools":prof['tools'],"tool_choice":"auto","stream":False}
+          body={"model":"big-pickle","max_tokens":32000,"messages":[{"role":"system","content":'\n'.join(out)},{"role":"user","content":"Reply with exactly OK"}],"tools":prof['tools'],"tool_choice":"auto","stream":True,"stream_options":{"include_usage":True}}
           open('/tmp/body.b64','w').write(base64.b64encode(json.dumps(body).encode()).decode())
           import time,secrets
           chars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
