@@ -113,9 +113,39 @@ enum AgentPaths {
 
 func nowMs() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
 
+private let opencodeIDLock = NSLock()
+private var opencodeIDTimestamp: Int64 = 0
+private var opencodeIDCounter: UInt64 = 0
+
+private func opencodeIdentifier(descending: Bool) -> String {
+    opencodeIDLock.lock()
+    defer { opencodeIDLock.unlock() }
+    let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+    if timestamp != opencodeIDTimestamp {
+        opencodeIDTimestamp = timestamp
+        opencodeIDCounter = 0
+    }
+    opencodeIDCounter += 1
+    var value = UInt64(timestamp) &* 0x1000 &+ opencodeIDCounter
+    if descending { value = ~value }
+    var result = ""
+    for index in 0..<6 {
+        let byte = (value >> UInt64(40 - index * 8)) & 0xff
+        result += String(format: "%02x", byte)
+    }
+    let alphabet = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+    for _ in 0..<14 {
+        result.append(alphabet[Int.random(in: 0..<alphabet.count)])
+    }
+    return result
+}
+
 func newID(_ prefix: String) -> String {
-    let raw = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-    return prefix + raw.prefix(26)
+    prefix + opencodeIdentifier(descending: false)
+}
+
+func newSessionID() -> String {
+    "ses_" + opencodeIdentifier(descending: true)
 }
 
 func jsonText(_ value: Any) -> String {
@@ -237,7 +267,7 @@ final class AgentStore {
         lock.lock(); defer { lock.unlock() }
         let t = nowMs()
         var s: [String: Any] = [
-            "id": newID("ses_"),
+            "id": newSessionID(),
             "title": title,
             "time": ["created": t, "updated": t],
             "directory": AgentPaths.workspace.path

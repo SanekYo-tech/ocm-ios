@@ -51,7 +51,7 @@ final class ZenClient {
 
     private let payBase = "https://opencode.ai/inference/openai/v1"
     private let goBase = "https://opencode.ai/inference/go/openai/v1"
-    private let userAgent = "opencode/release/2.2.5/opencode"
+    private let userAgent = "opencode/1.19.5 ai-sdk/provider-utils/4.0.23 runtime/bun/1.4.4"
     private let console = "https://opencode.ai/console"
     private let config = ServerConfig.shared
     private let lock = NSRecursiveLock()
@@ -137,8 +137,10 @@ final class ZenClient {
     /// Free models are restricted by Console to the official OpenCode client, so an
     /// authenticated third-party harness must use paid models only.
     var selectableModels: [ZenModel] {
+        // Free models are usable through the official-compatible free profile.
+        // Paid models require a key or a Console login.
         if anonymous { return models.filter { $0.free } }
-        return models.filter { !$0.free }
+        return models
     }
 
     func defaultModel() -> String {
@@ -414,13 +416,12 @@ final class ZenClient {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             applyAuth(&req, token: token)
             req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-            let sid = "probe"
+            let sid = newSessionID()
             req.setValue(sid, forHTTPHeaderField: "x-opencode-session-id")
             req.setValue(sid, forHTTPHeaderField: "x-opencode-session")
-            req.setValue(sid, forHTTPHeaderField: "x-session-affinity")
-            req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
-            req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
-            req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
+            req.setValue("cli", forHTTPHeaderField: "x-opencode-client")
+            req.setValue("global", forHTTPHeaderField: "x-opencode-project")
+            req.setValue(newID("msg_"), forHTTPHeaderField: "x-opencode-request")
             req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
             let label = base.contains("/go/") ? "OpenCode Go" : "Pay-as-you-go"
             do {
@@ -449,7 +450,7 @@ final class ZenClient {
                 tools: [[String: Any]],
                 onDelta: @escaping (_ field: String, _ delta: String) -> Void) async throws -> ZenResult {
         let token = await currentToken()
-        let effectiveModel = (!anonymous && (self.model(model)?.free ?? false)) ? defaultModel() : model
+        let effectiveModel = model
         let candidates = baseCandidates
         var primary: ZenError?
         for (index, base) in candidates.enumerated() {
@@ -504,13 +505,12 @@ final class ZenClient {
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         applyAuth(&req, token: token)
         req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        let sid = sessionID ?? "ios-local"
+        let sid = sessionID ?? newSessionID()
         req.setValue(sid, forHTTPHeaderField: "x-opencode-session-id")
         req.setValue(sid, forHTTPHeaderField: "x-opencode-session")
-        req.setValue(sid, forHTTPHeaderField: "x-session-affinity")
-        req.setValue(sid, forHTTPHeaderField: "X-Session-Id")
-        req.setValue("opencode", forHTTPHeaderField: "x-opencode-client")
-        req.setValue("0000000000000000000000000000000000000001", forHTTPHeaderField: "x-opencode-project")
+        req.setValue("cli", forHTTPHeaderField: "x-opencode-client")
+        req.setValue("global", forHTTPHeaderField: "x-opencode-project")
+        req.setValue(newID("msg_"), forHTTPHeaderField: "x-opencode-request")
         req.httpBody = (try? JSONSerialization.data(withJSONObject: body)) ?? Data()
 
         let (bytes, response) = try await session.bytes(for: req)

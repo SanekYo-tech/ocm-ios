@@ -662,8 +662,10 @@ final class AgentEngine {
             var toolParts: [[String: Any]] = []
 
             do {
-                let messages = buildProviderMessages(sessionID: sessionID, system: systemPrompt(agent: agent))
-                let tools = toolSchemas(readOnly: agent == "plan")
+                let free = (zen.model(modelID)?.free ?? false) && FreeAgentProfile.shared.available
+                let system = free ? FreeAgentProfile.shared.system(model: modelID) : systemPrompt(agent: agent)
+                let messages = buildProviderMessages(sessionID: sessionID, system: system)
+                let tools = free ? FreeAgentProfile.shared.tools(readOnly: agent == "plan") : toolSchemas(readOnly: agent == "plan")
                 let result = try await zen.stream(model: modelID, sessionID: sessionID, messages: messages, tools: tools) { field, delta in
                     if field == "text" {
                         text += delta

@@ -376,7 +376,7 @@ struct ModelPickerView: View {
                         }
                     }
                     Section {
-                        Text("Бесплатные модели Console работают только в официальном OpenCode. В этом приложении выбирай платную модель или модель Go.")
+                        Text("Бесплатные модели идут через free-профиль OpenCode. Если Console всё равно вернёт 403, выбери платную модель или модель Go.")
                             .font(.system(size: 12))
                             .foregroundStyle(OCTheme.muted)
                     }

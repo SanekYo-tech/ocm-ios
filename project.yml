@@ -42,6 +42,7 @@ targets:
       - path: Resources/commandDictionary.plist
       - path: Resources/extraCommandsDictionary.plist
       - path: Resources/default-config.json
+      - path: Resources/free-agent.json
     dependencies:
       - framework: Vendor/ios_system.xcframework
         embed: true
