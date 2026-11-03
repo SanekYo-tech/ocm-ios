@@ -117,7 +117,20 @@ NSData * _Nullable BoringHTTPPost(NSString *host,
     NSMutableString *request = [NSMutableString string];
     [request appendFormat:@"POST %@ HTTP/1.1\r\n", path];
     [request appendFormat:@"Host: %@\r\n", host];
+    NSArray<NSString *> *preferred = @[
+        @"Authorization", @"Content-Type", @"User-Agent",
+        @"x-opencode-client", @"x-opencode-project", @"x-opencode-request",
+        @"x-opencode-session", @"x-opencode-session-id", @"Accept"
+    ];
+    NSMutableSet<NSString *> *sent = [NSMutableSet set];
+    for (NSString *key in preferred) {
+        NSString *value = headers[key];
+        if (!value) continue;
+        [request appendFormat:@"%@: %@\r\n", key, value];
+        [sent addObject:key];
+    }
     for (NSString *key in headers) {
+        if ([sent containsObject:key]) continue;
         [request appendFormat:@"%@: %@\r\n", key, headers[key]];
     }
     [request appendFormat:@"Content-Length: %lu\r\n", (unsigned long)body.length];
