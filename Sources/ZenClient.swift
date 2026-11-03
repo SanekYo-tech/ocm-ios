@@ -137,10 +137,10 @@ final class ZenClient {
     /// Free models are restricted by Console to the official OpenCode client, so an
     /// authenticated third-party harness must use paid models only.
     var selectableModels: [ZenModel] {
-        // Free models are usable through the official-compatible free profile.
-        // Paid models require a key or a Console login.
+        // Free models are tied by Console to the official Bun client and are
+        // rejected by URLSession. With a key/login only paid models are useful.
         if anonymous { return models.filter { $0.free } }
-        return models
+        return models.filter { !$0.free }
     }
 
     func defaultModel() -> String {
