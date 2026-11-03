@@ -54,7 +54,9 @@ jobs:
           cat "$CONTAINER/Documents/boring-test.txt" || true
           ls -lh "$CONTAINER/Documents/boring-body.json" || true
           cat "$CONTAINER/Documents/boring-local.txt" || true
-          head -c 500 "$CONTAINER/Documents/boring-body.json" || true
+          cp "$CONTAINER/Documents/boring-body.json" "$RUNNER_TEMP/boring-body.json" 2>/dev/null || true
+          cp "$CONTAINER/Documents/boring-headers.txt" "$RUNNER_TEMP/boring-headers.txt" 2>/dev/null || true
+          cat "$RUNNER_TEMP/boring-headers.txt" || true
           echo; echo HELLO; cat "$RUNNER_TEMP/hello.hex" || true
           kill "$SRV" 2>/dev/null || true
           wait "$SRV" 2>/dev/null || true
@@ -66,4 +68,6 @@ jobs:
             ${{ runner.temp }}/console.txt
             ${{ runner.temp }}/hello.hex
             ${{ runner.temp }}/hello.log
+            ${{ runner.temp }}/boring-body.json
+            ${{ runner.temp }}/boring-headers.txt
           if-no-files-found: ignore

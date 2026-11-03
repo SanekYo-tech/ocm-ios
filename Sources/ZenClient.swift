@@ -482,6 +482,10 @@ final class ZenClient {
             "x-opencode-session-id": sid,
             "Accept": "*/*"
         ]
+        if ProcessInfo.processInfo.environment["OCM_BORING_TEST"] == "1" {
+            let hpath = AgentPaths.workspace.appendingPathComponent("boring-headers.txt")
+            try? headers.map { "\($0.key): \($0.value)" }.joined(separator: "\n").write(to: hpath, atomically: true, encoding: .utf8)
+        }
         guard let response = await BoringTransport.post(host: "opencode.ai",
                                                         path: "/inference/openai/v1/chat/completions",
                                                         headers: headers,
